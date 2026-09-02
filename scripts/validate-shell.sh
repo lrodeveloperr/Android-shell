@@ -139,12 +139,3 @@ if [[ "${1:-}" == "--strict" ]] && grep -q 'DECISION_REQUIRED' "$root/docs/APP_P
 fi
 
 echo "Shell structure validated${1:+ ($1)}."
- || true
-)
-
-if [[ "${1:-}" == "--strict" ]] && grep -q 'DECISION_REQUIRED' "$root/docs/APP_POLICY_PROFILE.md"; then
-  echo "Strict release blocked: complete docs/APP_POLICY_PROFILE.md." >&2
-  exit 1
-fi
-
-echo "Shell structure validated${1:+ ($1)}."
