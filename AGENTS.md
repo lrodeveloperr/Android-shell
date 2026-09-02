@@ -2,7 +2,7 @@
 
 This repository is a reusable **native Android shell**. It is Kotlin and Jetpack Compose only. The shell owns repetitive application infrastructure; a derived app supplies its product logic through the feature-canvas boundary.
 
-Read this file before changing code.
+Read this file before changing code. The locked shell contract is **2.1.0**; read `docs/SHELL_MIGRATIONS.md` before upgrading a derived app.
 
 ## Non-negotiable architecture
 
@@ -13,6 +13,8 @@ Read this file before changing code.
 - Do not fork or duplicate shell screens inside product code.
 - Do not expose the feature canvas until `resolveFeatureAccess` returns an allowed result.
 - Never grant paid access from a UI toggle, cached boolean, purchase callback alone, or unverified Play response.
+- Never place the app logo, launcher icon, brand-mark image, or decorative app identity artwork on a paywall, purchase, subscription, restore, win-back, or promotional-purchase surface.
+- Complete `docs/APP_POLICY_PROFILE.md` and `docs/STORE_COMPLIANCE_CHECKLIST.md` for every derived app. Strict validation must remain blocked while `DECISION_REQUIRED` exists.
 - GitHub Actions are manual-only. Never trigger a workflow unless the user explicitly requests it.
 
 ## Five-minute source map
@@ -28,6 +30,10 @@ Read this file before changing code.
 | Semantic icons | `ShellIconCatalog.kt` |
 | Billing and verification | `data/BillingController.kt`, `data/AccessPolicy.kt` |
 | Durable shell state | `data/ShellStateStore.kt` |
+| Optional backup seam (disabled by default) | `data/BackupProvider.kt` |
+| Store policy router and release profile | `docs/STORE_COMPLIANCE_CHECKLIST.md`, `docs/APP_POLICY_PROFILE.md` |
+| UI regression coverage | `docs/UI_REGRESSION_MATRIX.md`, `PaywallComplianceUiTest.kt` |
+| Contract migrations | `docs/SHELL_MIGRATIONS.md` |
 | Ads and consent | `ui/AdBanner.kt`, `data/AdConsentController.kt` |
 | Shared localization | `localization/GoodUseLocalization.kt`, `app/src/main/assets/gooduse-common-localization-v1.json` |
 | Locked/custom boundary | `docs/LOCKED_SHELL_SPEC.md` |
@@ -141,3 +147,11 @@ When execution is authorized, validate the exact artifact:
 - Ad-free: `bash scripts/validate-shell.sh --strict noAds`
 
 Do not start GitHub Actions as a substitute for an unrequested local run.
+
+
+## Compliance baseline added in contract 2.1.0
+
+- First launch defaults to legal-only acceptance. Product tours are an explicit per-app choice.
+- Purchase surfaces are text-and-controls only: no app logo, launcher icon, or brand imagery.
+- Backup is a native interface with `DisabledBackupProvider` as the default; supplying a cloud provider requires new privacy, account, retention, deletion, and Data safety decisions.
+- The policy profile is intentionally incomplete in the template. Replace every `DECISION_REQUIRED` before a release candidate.

@@ -45,7 +45,9 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import com.goodusestudios.shell.BuildConfig
 import com.goodusestudios.shell.data.AccessDenialReason
 import com.goodusestudios.shell.data.BillingController
+import com.goodusestudios.shell.data.BackupProvider
 import com.goodusestudios.shell.data.BillingUiState
+import com.goodusestudios.shell.data.DisabledBackupProvider
 import com.goodusestudios.shell.data.FeatureAccess
 import com.goodusestudios.shell.data.PlaySignaturePurchaseVerifier
 import com.goodusestudios.shell.data.PurchaseVerifier
@@ -58,7 +60,7 @@ import com.goodusestudios.shell.data.resolveFeatureAccess
 import com.goodusestudios.shell.localization.rememberGoodUseLabelResolver
 import kotlinx.coroutines.launch
 
-private enum class Route { Main, Settings, Icons, Lab, Paywall, Privacy, Terms }
+private enum class Route { Main, Settings, Icons, Lab, Paywall, Backup, Privacy, Terms }
 
 @Composable
 fun ShellApp(
@@ -67,6 +69,7 @@ fun ShellApp(
     onPrivacyOptions: () -> Unit,
     featureCanvas: FeatureCanvas = DefaultFeatureCanvas,
     purchaseVerifier: PurchaseVerifier? = null,
+    backupProvider: BackupProvider = DisabledBackupProvider,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -107,7 +110,7 @@ fun ShellApp(
                 definition.onboarding.presentation == OnboardingPresentation.None &&
                 definition.onboarding.requireLegalAcceptance
             ) {
-                LegalUpdateScreen(
+                LegalOnlyOnboardingScreen(
                     legal = definition.legal,
                     onPrivacy = { onboardingDialog = Route.Privacy },
                     onTerms = { onboardingDialog = Route.Terms },
@@ -172,6 +175,7 @@ fun ShellApp(
                             onResetOnboarding = { scope.launch { stateStore.resetOnboarding() } },
                             onLanguage = { showLanguageDialog = true },
                             onPrivacyOptions = onPrivacyOptions,
+                            backupProvider = backupProvider,
                             billingController = billingController,
                         )
                     }
@@ -190,6 +194,7 @@ fun ShellApp(
                         onResetOnboarding = { scope.launch { stateStore.resetOnboarding() } },
                         onLanguage = { showLanguageDialog = true },
                         onPrivacyOptions = onPrivacyOptions,
+                        backupProvider = backupProvider,
                         billingController = billingController,
                     )
                 }
@@ -248,17 +253,20 @@ private fun ShellScaffold(
     onResetOnboarding: () -> Unit,
     onLanguage: () -> Unit,
     onPrivacyOptions: () -> Unit,
+    backupProvider: BackupProvider,
     billingController: BillingController,
 ) {
     val context = LocalContext.current
     val label = rememberGoodUseLabelResolver()
     val legal = ShellConfig.definition.legal
+    val backupState by backupProvider.state.collectAsStateWithLifecycle()
     val title = when (route) {
         Route.Main -> ShellConfig.destinations.first { it.id == destinationId }.label
         Route.Settings -> label("common.settings")
         Route.Icons -> "Icon library"
         Route.Lab -> "Shell Lab"
         Route.Paywall -> "Upgrade"
+        Route.Backup -> "Backup"
         Route.Privacy -> label("common.privacyPolicy")
         Route.Terms -> label("common.termsOfUse")
     }
@@ -328,12 +336,21 @@ private fun ShellScaffold(
                     onIcons = { onNavigate(Route.Icons) },
                     onLanguage = onLanguage,
                     onPrivacyOptions = onPrivacyOptions,
+                    backupAvailable = backupProvider.isAvailable,
+                    backupProviderName = backupProvider.displayName,
+                    onBackup = { onNavigate(Route.Backup) },
                     onLab = { if (BuildConfig.DEBUG) onNavigate(Route.Lab) },
                     onPrivacy = { onNavigate(Route.Privacy) },
                     onTerms = { onNavigate(Route.Terms) },
                     onSupport = { openUri(context, "mailto:${ShellConfig.supportEmail}") },
                 )
                 Route.Icons -> IconLibraryScreen()
+                Route.Backup -> BackupScreen(
+                    providerName = backupProvider.displayName,
+                    state = backupState,
+                    onCreate = { backupProvider.createBackup() },
+                    onRestore = { backupProvider.restoreLatest() },
+                )
                 Route.Lab -> if (BuildConfig.DEBUG) {
                     LabScreen(monetizationMode, contentState, onMonetizationMode, onContentState, onRemoveAds, onResetOnboarding)
                 } else {

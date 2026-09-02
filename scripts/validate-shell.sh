@@ -16,7 +16,14 @@ required=(
   "$root/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
   "$root/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml"
   "$root/app/src/main/java/com/goodusestudios/shell/data/AccessPolicy.kt"
+  "$root/app/src/main/java/com/goodusestudios/shell/data/BackupProvider.kt"
   "$root/app/src/main/java/com/goodusestudios/shell/ui/FeatureCanvas.kt"
+  "$root/app/src/androidTest/java/com/goodusestudios/shell/PaywallComplianceUiTest.kt"
+  "$root/AGENTS.md"
+  "$root/docs/STORE_COMPLIANCE_CHECKLIST.md"
+  "$root/docs/APP_POLICY_PROFILE.md"
+  "$root/docs/UI_REGRESSION_MATRIX.md"
+  "$root/docs/SHELL_MIGRATIONS.md"
   "$root/app/src/main/res/xml/locales_config.xml"
   "$ads_manifest"
   "$root/app/src/noAds/AndroidManifest.xml"
@@ -95,3 +102,29 @@ if [[ "${1:-}" == "--strict" ]]; then
 fi
 
 echo "Shell structure validated${1:+ ($1)}."
+
+
+# Locked contract and conservative defaults.
+grep -q 'const val contractVersion = "2.1.0"' "$config"
+grep -q 'presentation = OnboardingPresentation.None' "$config"
+grep -q 'object DisabledBackupProvider' "$root/app/src/main/java/com/goodusestudios/shell/data/BackupProvider.kt"
+
+# Purchase surfaces must never contain the app logo, launcher icon, or any brand-mark image.
+paywall_source="$(sed -n '/^fun PaywallScreen(/,/^fun LegalScreen(/p' "$root/app/src/main/java/com/goodusestudios/shell/ui/ShellScreens.kt")"
+for forbidden in 'Image(' 'painterResource(' 'ic_brand_mark' 'ic_launcher'; do
+  if grep -Fq "$forbidden" <<<"$paywall_source"; then
+    echo "Purchase-surface policy violation: PaywallScreen contains $forbidden" >&2
+    exit 1
+  fi
+done
+for required_text in 'Restore purchases' 'Privacy' 'Terms' 'renews automatically' 'One-time purchase'; do
+  grep -Fq "$required_text" <<<"$paywall_source" || {
+    echo "Purchase-surface disclosure missing: $required_text" >&2
+    exit 1
+  }
+done
+
+if [[ "${1:-}" == "--strict" ]] && grep -q 'DECISION_REQUIRED' "$root/docs/APP_POLICY_PROFILE.md"; then
+  echo "Strict release blocked: complete docs/APP_POLICY_PROFILE.md." >&2
+  exit 1
+fi

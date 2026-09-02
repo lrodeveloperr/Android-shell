@@ -10,7 +10,7 @@ Start with [`AGENTS.md`](AGENTS.md). It is the operational source map for the lo
 
 - Material 3, edge-to-edge, dynamic color, light/dark mode, large text, RTL support
 - Compact bottom navigation and expanded navigation rail using window width—not device names
-- Configurable pager/single/disabled onboarding, versioned legal re-consent, Settings, help, paywall, and component lab
+- Legal-only first launch by default, optional pager/single-page education, versioned legal re-consent, Settings, help, paywall, and component lab
 - A centralized, searchable semantic icon catalog backed by the complete Compose Material icon dependency
 - Populated, empty, loading, and error states
 - Anchored adaptive AdMob test banner that never overlays navigation or content
@@ -20,6 +20,8 @@ Start with [`AGENTS.md`](AGENTS.md). It is the operational source map for the lo
 - Adaptive/round/themed launcher icons, system splash, in-app mark, and checked 512 px Play asset
 - DataStore persistence and a locked 31-language shared-core bundle with native per-app language selection
 - Injectable Compose `FeatureCanvas`; derived apps replace product functionality without forking shell mechanics
+- Optional native backup provider seam, disabled and network-free by default
+- Purchase-surface guard: paywalls, restore, win-back, and purchase promotions contain no app logo or brand-mark imagery
 - Ad-free build switch that removes the advertising-ID manifest declaration and never initializes UMP/AdMob
 - CI contract validation, tests, lint, and a debug APK artifact
 
@@ -65,3 +67,16 @@ All advertising identifiers committed here are Google’s test identifiers. Neve
 ## Icon policy
 
 The template exposes the full legacy Compose Material icon set for speed, while `ShellIconCatalog` provides the searchable, semantic subset used by shell screens. Google now recommends Material Symbols for new icons. Download only the required Android Vector Drawable from Google Fonts, add it to the catalog, and let R8 remove unused icon code from release builds. Decorative icons use a null content description; actionable icons require a localized description.
+
+
+## Release control
+
+The locked shell contract is **2.1.0**. Before shipping a derived app:
+
+1. Complete [the app policy profile](docs/APP_POLICY_PROFILE.md); no `DECISION_REQUIRED` values may remain.
+2. Work through [the store compliance checklist](docs/STORE_COMPLIANCE_CHECKLIST.md), including every conditional policy that the app activates.
+3. Execute [the UI regression matrix](docs/UI_REGRESSION_MATRIX.md) on the actual release configuration.
+4. Review [shell migrations](docs/SHELL_MIGRATIONS.md) when adopting a newer shell contract.
+5. Run `scripts/validate-shell.sh --strict` locally. GitHub Actions remain manual-only.
+
+A reusable shell can enforce a strong baseline, but store approval also depends on the derived app’s functionality, SDKs, metadata, audience, category, territories, accounts, and current policy. The checklist is a release gate, not an approval guarantee.

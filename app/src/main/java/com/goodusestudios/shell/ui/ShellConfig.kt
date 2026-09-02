@@ -11,6 +11,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
  * definition; product code should not fork onboarding, legal, billing, or navigation UI.
  */
 object ShellConfig {
+    /** Locked shell contract. Derived apps must follow docs/SHELL_MIGRATIONS.md when this changes. */
+    const val contractVersion = "2.1.0"
+
     val definition = ShellDefinition(
         brand = BrandConfig(appName = "Shell", supportEmail = "support@example.com"),
         legal = LegalConfig(
@@ -21,15 +24,13 @@ object ShellConfig {
             privacyBody = "This shell does not collect personal data. Replace this placeholder with the derived app’s reviewed privacy policy, data inventory, retention rules, advertising disclosures, and contact details before distribution.",
             termsBody = "This shell is a reusable development template. Replace these terms with the derived app’s reviewed terms, purchase conditions, subscription renewal language, and jurisdiction-specific clauses before distribution.",
         ),
+        // Stable baseline: first launch asks only for required legal acceptance.
+        // A derived app may explicitly opt into SinglePage or Pager when education is genuinely needed.
         onboarding = OnboardingConfig(
-            presentation = OnboardingPresentation.Pager,
-            showBrandMark = true,
+            presentation = OnboardingPresentation.None,
+            showBrandMark = false,
             requireLegalAcceptance = true,
-            pages = listOf(
-                OnboardingPage("01", "A faster starting point", "Adaptive navigation, settings, legal, monetization, and polished states are ready."),
-                OnboardingPage("02", "Native on every screen", "Compact phones use bottom navigation. Larger windows gain a navigation rail and more useful space."),
-                OnboardingPage("03", "Skin it, then build", "Change configuration and brand assets first. Replace only the product feature area."),
-            ),
+            pages = emptyList(),
         ),
         monetization = MonetizationConfig(
             initialMode = MonetizationMode.AdsWithRemovePurchase,

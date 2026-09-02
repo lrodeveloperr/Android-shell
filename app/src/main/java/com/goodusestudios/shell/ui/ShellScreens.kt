@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.LockOpen
@@ -60,11 +61,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.goodusestudios.shell.R
+import com.goodusestudios.shell.data.BackupUiState
 import com.goodusestudios.shell.data.BillingStatus
 import com.goodusestudios.shell.data.BillingUiState
 import com.goodusestudios.shell.localization.GoodUseCommonLocalization
@@ -122,7 +125,11 @@ fun OnboardingScreen(
 private fun OnboardingHeader(showBrandMark: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (showBrandMark) {
-            Image(painterResource(R.drawable.ic_brand_mark), "${ShellConfig.appName} logo", Modifier.size(42.dp))
+            Image(
+                painterResource(R.drawable.ic_brand_mark),
+                "${ShellConfig.appName} logo",
+                Modifier.size(42.dp).testTag("shell-app-logo"),
+            )
         }
         Text(ShellConfig.appName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
     }
@@ -172,6 +179,39 @@ private fun OnboardingActions(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             TextButton(onClick = onPrivacy) { Text("Privacy") }
             TextButton(onClick = onTerms) { Text("Terms") }
+        }
+    }
+}
+
+@Composable
+fun LegalOnlyOnboardingScreen(
+    legal: LegalConfig,
+    onPrivacy: () -> Unit,
+    onTerms: () -> Unit,
+    onAccept: () -> Unit,
+) {
+    var accepted by rememberSaveable { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) {
+        Column(
+            Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(28.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Text("Before you continue", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Review the Privacy Policy and Terms of Use effective ${legal.effectiveDate}.")
+            Row {
+                TextButton(onClick = onPrivacy) { Text("Privacy policy") }
+                TextButton(onClick = onTerms) { Text("Terms of use") }
+            }
+            Row(
+                Modifier.fillMaxWidth().clickable { accepted = !accepted },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(accepted, { accepted = it })
+                Text("I accept version ${legal.version}.")
+            }
+            Button(onClick = onAccept, enabled = accepted, modifier = Modifier.fillMaxWidth()) {
+                Text("Accept and continue")
+            }
         }
     }
 }
@@ -273,6 +313,9 @@ fun SettingsScreen(
     onIcons: () -> Unit,
     onLanguage: () -> Unit,
     onPrivacyOptions: () -> Unit,
+    backupAvailable: Boolean,
+    backupProviderName: String,
+    onBackup: () -> Unit,
     onLab: () -> Unit,
     onPrivacy: () -> Unit,
     onTerms: () -> Unit,
@@ -288,13 +331,16 @@ fun SettingsScreen(
         if (privacyOptionsRequired) {
             item { SettingsRow("Ad privacy choices", "Review or withdraw advertising consent", Icons.Outlined.PrivacyTip, onPrivacyOptions) }
         }
+        if (backupAvailable) {
+            item { SettingsRow("Backup", backupProviderName, Icons.Outlined.Cloud, onBackup) }
+        }
         item { SettingsRow(label("common.support"), ShellConfig.supportEmail, Icons.Outlined.SupportAgent, onSupport) }
         item { SettingsRow(label("common.privacyPolicy"), null, Icons.Outlined.Policy, onPrivacy) }
         item { SettingsRow(label("common.termsOfUse"), null, Icons.Outlined.CheckCircle, onTerms) }
         if (showLab) item { SettingsRow("Shell Lab", "Exercise every reusable state", Icons.Outlined.Science, onLab) }
         item {
             Text(
-                "Shell 2.0 · Run strict validation before shipping a derived app.",
+                "Shell ${ShellConfig.contractVersion} · Run strict validation before shipping a derived app.",
                 Modifier.padding(20.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -312,6 +358,41 @@ private fun SettingsRow(title: String, subtitle: String?, icon: androidx.compose
         trailingContent = { Icon(Icons.Outlined.ChevronRight, null) },
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     )
+}
+
+@Composable
+fun BackupScreen(
+    providerName: String,
+    state: BackupUiState,
+    onCreate: () -> Unit,
+    onRestore: () -> Unit,
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(24.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item {
+            Icon(Icons.Outlined.Cloud, null)
+            Spacer(Modifier.height(12.dp))
+            Text("Optional backup", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "Backups use ${providerName}. The shell never enables cloud storage or account collection unless a derived app supplies and documents a provider.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        item {
+            Button(onClick = onCreate, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
+                Text("Create backup")
+            }
+        }
+        item {
+            OutlinedButton(onClick = onRestore, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
+                Text("Restore latest backup")
+            }
+        }
+        if (state.working) item { CircularProgressIndicator() }
+        state.message?.let { message -> item { Text(message) } }
+    }
 }
 
 @Composable
@@ -408,7 +489,11 @@ fun PaywallScreen(
         }
     }
     val selected = billing.products.firstOrNull { it.id == selectedId }
-    LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    LazyColumn(
+        modifier = Modifier.testTag("shell-paywall"),
+        contentPadding = PaddingValues(24.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
         item {
             Text("Make the useful thing unlimited.", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -440,18 +525,37 @@ fun PaywallScreen(
         if (billing.status == BillingStatus.Unavailable) {
             item { OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Reconnect to Google Play") } }
         }
+        selected?.let { product ->
+            item {
+                Text(
+                    if (product.kind == StoreProductKind.Subscription) {
+                        "Subscription renews automatically at ${product.formattedPrice} for the displayed billing period until cancelled in Google Play."
+                    } else {
+                        "One-time purchase. This charge does not recur."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         item {
             Button(
                 onClick = { selected?.id?.let(onPurchase) },
                 enabled = selected?.available == true && !billing.working,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("shell-purchase"),
             ) { Text(if (billing.entitled) "Access active" else "Continue · ${selected?.formattedPrice ?: "choose a product"}") }
         }
-        item { TextButton(onClick = onRestore, enabled = !billing.working, modifier = Modifier.fillMaxWidth()) { Text("Restore purchases") } }
+        item {
+            TextButton(
+                onClick = onRestore,
+                enabled = !billing.working,
+                modifier = Modifier.fillMaxWidth().testTag("shell-restore"),
+            ) { Text("Restore purchases") }
+        }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                TextButton(onClick = onPrivacy) { Text("Privacy") }
-                TextButton(onClick = onTerms) { Text("Terms") }
+                TextButton(onClick = onPrivacy, modifier = Modifier.testTag("shell-privacy")) { Text("Privacy") }
+                TextButton(onClick = onTerms, modifier = Modifier.testTag("shell-terms")) { Text("Terms") }
             }
         }
     }
