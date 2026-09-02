@@ -28,7 +28,9 @@ jobs:
       - name: Validate locked shell contract
         run: bash scripts/validate-shell.sh
       - name: Verify and build APK
-        run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug
+        run: |
+          gradle --no-daemon testDebugUnitTest assembleDebug
+          gradle --no-daemon lintDebug || { cat app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: Shell-debug-apk
