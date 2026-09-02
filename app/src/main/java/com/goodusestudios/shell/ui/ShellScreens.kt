@@ -68,6 +68,7 @@ fun OnboardingScreen(onPrivacy: () -> Unit, onTerms: () -> Unit, onComplete: () 
     var page by remember { mutableIntStateOf(0) }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val layoutMode = onboardingLayoutModeFor(maxHeight.value.toInt(), LocalDensity.current.fontScale)
+        val anchoredTopGap = if (maxHeight >= 900.dp) 56.dp else 40.dp
         val contentModifier = Modifier
             .align(Alignment.Center)
             .fillMaxHeight()
@@ -88,7 +89,7 @@ fun OnboardingScreen(onPrivacy: () -> Unit, onTerms: () -> Unit, onComplete: () 
         } else {
             Column(contentModifier) {
                 OnboardingHeader()
-                Spacer(Modifier.height(if (maxHeight >= 900.dp) 56.dp else 40.dp))
+                Spacer(Modifier.height(anchoredTopGap))
                 OnboardingPage(pages[page])
                 Spacer(Modifier.weight(1f))
                 OnboardingActions(page, pages.lastIndex, onPrivacy, onTerms, { page-- }) {
