@@ -1,5 +1,7 @@
 package com.goodusestudios.shell.ui
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -7,16 +9,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -29,12 +31,14 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Policy
+import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -46,26 +50,35 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.goodusestudios.shell.R
+import com.goodusestudios.shell.data.BillingStatus
+import com.goodusestudios.shell.data.BillingUiState
 
 @Composable
-fun OnboardingScreen(onPrivacy: () -> Unit, onTerms: () -> Unit, onComplete: () -> Unit) {
-    val pages = listOf(
-        Triple("A faster starting point", "Adaptive navigation, settings, legal, monetization seams, and polished states are ready.", "01"),
-        Triple("Native on every screen", "Compact phones use bottom navigation. Larger windows gain a navigation rail and more useful space.", "02"),
-        Triple("Skin it, then build", "Change tokens and configuration first. Replace placeholder features only after your product logic is settled.", "03"),
-    )
-    var page by remember { mutableIntStateOf(0) }
+fun OnboardingScreen(
+    config: OnboardingConfig,
+    legal: LegalConfig,
+    onPrivacy: () -> Unit,
+    onTerms: () -> Unit,
+    onComplete: () -> Unit,
+) {
+    val pages = if (config.presentation == OnboardingPresentation.SinglePage) config.pages.take(1) else config.pages
+    var page by rememberSaveable { mutableIntStateOf(0) }
+    var legalAccepted by rememberSaveable { mutableStateOf(false) }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val layoutMode = onboardingLayoutModeFor(maxHeight.value.toInt(), LocalDensity.current.fontScale)
         val anchoredTopGap = if (maxHeight >= 900.dp) 56.dp else 40.dp
@@ -78,21 +91,23 @@ fun OnboardingScreen(onPrivacy: () -> Unit, onTerms: () -> Unit, onComplete: () 
 
         if (layoutMode == OnboardingLayoutMode.Scrollable) {
             Column(contentModifier.verticalScroll(rememberScrollState())) {
-                OnboardingHeader()
+                OnboardingHeader(config.showBrandMark)
                 Spacer(Modifier.height(24.dp))
-                OnboardingPage(pages[page])
+                OnboardingPageContent(pages[page])
                 Spacer(Modifier.height(32.dp))
-                OnboardingActions(page, pages.lastIndex, onPrivacy, onTerms, { page-- }) {
+                OnboardingActions(page, pages.lastIndex, config.requireLegalAcceptance, legalAccepted, legal.version,
+                    onAccepted = { legalAccepted = it }, onPrivacy, onTerms, { page-- }) {
                     if (page < pages.lastIndex) page++ else onComplete()
                 }
             }
         } else {
             Column(contentModifier) {
-                OnboardingHeader()
+                OnboardingHeader(config.showBrandMark)
                 Spacer(Modifier.height(anchoredTopGap))
-                OnboardingPage(pages[page])
+                OnboardingPageContent(pages[page])
                 Spacer(Modifier.weight(1f))
-                OnboardingActions(page, pages.lastIndex, onPrivacy, onTerms, { page-- }) {
+                OnboardingActions(page, pages.lastIndex, config.requireLegalAcceptance, legalAccepted, legal.version,
+                    onAccepted = { legalAccepted = it }, onPrivacy, onTerms, { page-- }) {
                     if (page < pages.lastIndex) page++ else onComplete()
                 }
             }
@@ -101,16 +116,21 @@ fun OnboardingScreen(onPrivacy: () -> Unit, onTerms: () -> Unit, onComplete: () 
 }
 
 @Composable
-private fun OnboardingHeader() {
-    Text(ShellConfig.appName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+private fun OnboardingHeader(showBrandMark: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (showBrandMark) {
+            Image(painterResource(R.drawable.ic_brand_mark), "${ShellConfig.appName} logo", Modifier.size(42.dp))
+        }
+        Text(ShellConfig.appName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 @Composable
-private fun OnboardingPage(page: Triple<String, String, String>) {
+private fun OnboardingPageContent(page: OnboardingPage) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(page.third, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        Text(page.first, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-        Text(page.second, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(page.step, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        Text(page.title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+        Text(page.body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -118,16 +138,31 @@ private fun OnboardingPage(page: Triple<String, String, String>) {
 private fun OnboardingActions(
     page: Int,
     lastPage: Int,
+    requiresAcceptance: Boolean,
+    accepted: Boolean,
+    legalVersion: Int,
+    onAccepted: (Boolean) -> Unit,
     onPrivacy: () -> Unit,
     onTerms: () -> Unit,
     onBack: () -> Unit,
     onContinue: () -> Unit,
 ) {
+    val finalPage = page == lastPage
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (finalPage && requiresAcceptance) {
+            Row(
+                Modifier.fillMaxWidth().clickable { onAccepted(!accepted) }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = accepted, onCheckedChange = onAccepted)
+                Text("I accept the Terms of Use and acknowledge the Privacy Policy (version $legalVersion).")
+            }
+        }
         Button(
             onClick = onContinue,
+            enabled = !finalPage || !requiresAcceptance || accepted,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-        ) { Text(if (page == lastPage) "Get started" else "Continue") }
+        ) { Text(if (finalPage) "Get started" else "Continue") }
         if (page > 0) {
             OutlinedButton(onBack, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Back") }
         }
@@ -139,21 +174,47 @@ private fun OnboardingActions(
 }
 
 @Composable
-fun FeatureScreen(destination: String, state: SampleContentState, expanded: Boolean) {
+fun LegalUpdateScreen(legal: LegalConfig, onPrivacy: () -> Unit, onTerms: () -> Unit, onAccept: () -> Unit) {
+    var accepted by rememberSaveable { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) {
+        Column(
+            Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(28.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Text("Terms updated", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Review the documents effective ${legal.effectiveDate}. Acceptance is stored as legal version ${legal.version}, so a future version can ask again.")
+            Row {
+                TextButton(onClick = onPrivacy) { Text("Privacy policy") }
+                TextButton(onClick = onTerms) { Text("Terms of use") }
+            }
+            Row(
+                Modifier.fillMaxWidth().clickable { accepted = !accepted },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(accepted, { accepted = it })
+                Text("I accept version ${legal.version}.")
+            }
+            Button(onClick = onAccept, enabled = accepted, modifier = Modifier.fillMaxWidth()) { Text("Accept and continue") }
+        }
+    }
+}
+
+@Composable
+fun FeatureScreen(destination: String, state: SampleContentState, expanded: Boolean, onRetry: () -> Unit) {
     when (state) {
         SampleContentState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         SampleContentState.Empty -> StateMessage("Nothing here yet", "Your app’s primary empty state belongs here.")
-        SampleContentState.Error -> StateMessage("Couldn’t load content", "Keep the explanation human and offer one clear recovery action.", action = "Try again")
+        SampleContentState.Error -> StateMessage("Couldn’t load content", "Keep the explanation human and offer one clear recovery action.", "Try again", onRetry)
         SampleContentState.Populated -> {
-            val items = (1..8).map { "${destination.replaceFirstChar(Char::uppercase)} item $it" }
+            val content = (1..8).map { "${destination.replaceFirstChar(Char::uppercase)} item $it" }
             if (expanded) {
                 Row(Modifier.fillMaxSize()) {
-                    FeatureList(items, Modifier.weight(0.42f))
+                    FeatureList(content, Modifier.weight(0.42f))
                     Surface(Modifier.weight(0.58f).fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainerLow) {
                         StateMessage("Select an item", "A list-detail layout uses tablet space without merely stretching the phone UI.")
                     }
                 }
-            } else FeatureList(items, Modifier.fillMaxSize())
+            } else FeatureList(content, Modifier.fillMaxSize())
         }
     }
 }
@@ -182,7 +243,7 @@ private fun FeatureList(items: List<String>, modifier: Modifier) {
 }
 
 @Composable
-private fun StateMessage(title: String, message: String, action: String? = null) {
+private fun StateMessage(title: String, message: String, action: String? = null, onAction: (() -> Unit)? = null) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -193,9 +254,9 @@ private fun StateMessage(title: String, message: String, action: String? = null)
         Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        if (action != null) {
+        if (action != null && onAction != null) {
             Spacer(Modifier.height(20.dp))
-            Button(onClick = {}) { Text(action) }
+            Button(onClick = onAction) { Text(action) }
         }
     }
 }
@@ -203,8 +264,11 @@ private fun StateMessage(title: String, message: String, action: String? = null)
 @Composable
 fun SettingsScreen(
     monetizationMode: MonetizationMode,
+    privacyOptionsRequired: Boolean,
     onUpgrade: () -> Unit,
     onIcons: () -> Unit,
+    onLanguage: () -> Unit,
+    onPrivacyOptions: () -> Unit,
     onLab: () -> Unit,
     onPrivacy: () -> Unit,
     onTerms: () -> Unit,
@@ -212,17 +276,20 @@ fun SettingsScreen(
 ) {
     LazyColumn(contentPadding = PaddingValues(vertical = 12.dp)) {
         if (monetizationMode != MonetizationMode.Free) {
-            item { SettingsRow("Upgrade", "Manage purchases and restore access", Icons.Outlined.LockOpen, onUpgrade) }
+            item { SettingsRow("Upgrade", "Purchase or restore access", Icons.Outlined.LockOpen, onUpgrade) }
         }
         item { SettingsRow("Icon library", "Search reusable Material icons", Icons.Outlined.Apps, onIcons) }
-        item { SettingsRow("Language", "Follow system · English", Icons.Outlined.Language, {}) }
+        item { SettingsRow("App language", "System, English, or Spanish", Icons.Outlined.Language, onLanguage) }
+        if (privacyOptionsRequired) {
+            item { SettingsRow("Ad privacy choices", "Review or withdraw advertising consent", Icons.Outlined.PrivacyTip, onPrivacyOptions) }
+        }
         item { SettingsRow("Help & support", ShellConfig.supportEmail, Icons.Outlined.SupportAgent, onSupport) }
         item { SettingsRow("Privacy policy", null, Icons.Outlined.Policy, onPrivacy) }
         item { SettingsRow("Terms of use", null, Icons.Outlined.CheckCircle, onTerms) }
         item { SettingsRow("Shell Lab", "Exercise every reusable state", Icons.Outlined.Science, onLab) }
         item {
             Text(
-                "Shell 1.0 · Replace example URLs, product IDs, and ad IDs before shipping.",
+                "Shell 2.0 · Run strict validation before shipping a derived app.",
                 Modifier.padding(20.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -243,6 +310,35 @@ private fun SettingsRow(title: String, subtitle: String?, icon: androidx.compose
 }
 
 @Composable
+fun LanguageDialog(onDismiss: () -> Unit) {
+    val choices = listOf("" to "Follow system", "en" to "English", "es" to "Español")
+    val current = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("App language") },
+        text = {
+            Column {
+                choices.forEach { (tag, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable {
+                            androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                                androidx.core.os.LocaleListCompat.forLanguageTags(tag),
+                            )
+                            onDismiss()
+                        },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = current == tag, onClick = null)
+                        Text(label)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
+
+@Composable
 fun LabScreen(
     mode: MonetizationMode,
     state: SampleContentState,
@@ -254,7 +350,7 @@ fun LabScreen(
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item {
             Text("Monetization", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            MonetizationMode.values().forEach { value ->
+            MonetizationMode.entries.forEach { value ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = mode == value, onClick = { onMode(value) })
                     Text(value.readableName())
@@ -263,7 +359,7 @@ fun LabScreen(
         }
         item {
             Text("Feature state", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            SampleContentState.values().forEach { value ->
+            SampleContentState.entries.forEach { value ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = state == value, onClick = { onState(value) })
                     Text(value.name)
@@ -271,9 +367,9 @@ fun LabScreen(
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onRemoveAds) { Text("Toggle entitlement") }
-                OutlinedButton(onClick = onResetOnboarding) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onRemoveAds, modifier = Modifier.fillMaxWidth()) { Text("Toggle entitlement") }
+                OutlinedButton(onClick = onResetOnboarding, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.RestartAlt, null)
                     Spacer(Modifier.width(8.dp))
                     Text("Reset onboarding")
@@ -284,31 +380,80 @@ fun LabScreen(
 }
 
 @Composable
-fun PaywallScreen(onRestore: () -> Unit, onPurchase: () -> Unit) {
+fun PaywallScreen(
+    billing: BillingUiState,
+    benefits: List<String>,
+    onRetry: () -> Unit,
+    onRestore: () -> Unit,
+    onPurchase: (String) -> Unit,
+    onPrivacy: () -> Unit,
+    onTerms: () -> Unit,
+) {
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(billing.products) {
+        if (selectedId !in billing.products.map { it.id }) {
+            selectedId = billing.products.firstOrNull { it.available }?.id ?: billing.products.firstOrNull()?.id
+        }
+    }
+    val selected = billing.products.firstOrNull { it.id == selectedId }
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item {
             Text("Make the useful thing unlimited.", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Text("One focused value statement, transparent pricing, restore access, and legal links—without dark patterns.")
+            Text("Choose a Play product. Pricing and eligibility come directly from Google Play when the product is active.")
         }
-        items(listOf("Unlimited core actions", "No advertising", "Supports continued development")) { value ->
+        items(benefits) { value ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Text(value)
             }
         }
-        item { Button(onClick = onPurchase, modifier = Modifier.fillMaxWidth()) { Text("Continue · configured price") } }
-        item { TextButton(onClick = onRestore, modifier = Modifier.fillMaxWidth()) { Text("Restore purchases") } }
+        items(billing.products, key = { it.id }) { product ->
+            Card(
+                Modifier.fillMaxWidth().clickable(enabled = product.available) { selectedId = product.id },
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(product.id == selectedId, onClick = { selectedId = product.id }, enabled = product.available)
+                    Column(Modifier.weight(1f)) {
+                        Text(product.title, fontWeight = FontWeight.SemiBold)
+                        Text(product.formattedPrice, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (!product.available) Text("Unavailable in this build", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+        if (billing.working) item { CircularProgressIndicator() }
+        billing.message?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+        if (billing.status == BillingStatus.Unavailable) {
+            item { OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Reconnect to Google Play") } }
+        }
+        item {
+            Button(
+                onClick = { selected?.id?.let(onPurchase) },
+                enabled = selected?.available == true && !billing.working,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) { Text(if (billing.entitled) "Access active" else "Continue · ${selected?.formattedPrice ?: "choose a product"}") }
+        }
+        item { TextButton(onClick = onRestore, enabled = !billing.working, modifier = Modifier.fillMaxWidth()) { Text("Restore purchases") } }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                TextButton(onClick = onPrivacy) { Text("Privacy") }
+                TextButton(onClick = onTerms) { Text("Terms") }
+            }
+        }
     }
 }
 
 @Composable
-fun LegalScreen(title: String, body: String) {
+fun LegalScreen(title: String, body: String, effectiveDate: String, onOpenWeb: () -> Unit) {
     LazyColumn(contentPadding = PaddingValues(24.dp)) {
         item { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        item { Text("Effective $effectiveDate", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { Spacer(Modifier.height(16.dp)) }
         item { Text(body, style = MaterialTheme.typography.bodyLarge) }
+        item { Spacer(Modifier.height(16.dp)) }
+        item { OutlinedButton(onClick = onOpenWeb) { Text("Open published document") } }
     }
 }
 
@@ -321,9 +466,6 @@ fun LegalDialog(title: String, body: String, onDismiss: () -> Unit) {
         text = { Text(body) },
     )
 }
-
-const val privacyPlaceholder = "This shell does not collect personal data. Replace this placeholder with the derived app’s reviewed privacy policy, data inventory, retention rules, advertising disclosures, and contact details before distribution."
-const val termsPlaceholder = "This shell is a reusable development template. Replace these terms with the derived app’s reviewed terms, purchase conditions, subscription renewal language, and jurisdiction-specific clauses before distribution."
 
 private fun MonetizationMode.readableName() = when (this) {
     MonetizationMode.Free -> "Free"
