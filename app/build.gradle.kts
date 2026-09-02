@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val shellAdsEnabled = providers.gradleProperty("shellAdsEnabled").orElse("true").get().toBoolean()
+
 android {
     namespace = "com.goodusestudios.shell"
     compileSdk = 36
@@ -15,6 +17,8 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "SHELL_ADS_ENABLED", shellAdsEnabled.toString())
+        manifestPlaceholders["adManifestNode"] = if (shellAdsEnabled) "merge" else "remove"
     }
 
     buildTypes {
@@ -29,8 +33,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
-    androidResources { generateLocaleConfig = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    androidResources { generateLocaleConfig = false }
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
 }
 

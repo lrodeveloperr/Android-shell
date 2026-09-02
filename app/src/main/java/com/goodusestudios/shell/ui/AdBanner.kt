@@ -15,9 +15,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
+import com.goodusestudios.shell.BuildConfig
 
 @Composable
 fun AdaptiveAdBanner(modifier: Modifier = Modifier) {
+    if (!BuildConfig.SHELL_ADS_ENABLED) return
     val context = LocalContext.current
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val widthDp = maxWidth.value.toInt().coerceAtLeast(1)

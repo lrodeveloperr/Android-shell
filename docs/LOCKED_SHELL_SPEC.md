@@ -11,9 +11,9 @@ This is the shell’s operating contract. A derived app changes facts and produc
 | Pager, single-page, or disabled onboarding renderer | Onboarding page copy, count, and optional brand mark |
 | Versioned onboarding persistence and legal re-consent | Reviewed legal text, URLs, effective date, and version |
 | Adaptive, round, monochrome, splash, in-app, and 512 px store-icon slots | The actual representative app artwork and launcher color |
-| Product query, offer selection, Play flow, restore, entitlement state, and acknowledgement | Play Console products, IDs, benefits, prices/offers, and trusted verifier |
+| Product query, offer selection, Play flow, restore, product-scoped entitlement state, persistent usage metering, and acknowledgement | Play Console products, IDs, benefits, prices/offers, cap, grace period, and trusted verifier |
 | UMP consent update, ad-request gate, and privacy-options entry point | AdMob app/unit IDs, account messages, audience/age classification |
-| System/English/Spanish picker and generated locale config | Complete translated string resources for supported locales |
+| Locked 31-locale shared-core bundle, resolver precedence, picker, and locale config | App/domain localization delta |
 | Loading, empty, error/retry, populated, paywall, legal, settings, and component-lab states | Domain-specific actions and data |
 | CI structural checks and unit tests | Strict release-mode replacement of all template values |
 
@@ -34,13 +34,21 @@ Terms acceptance is not advertising consent and is not a substitute for a promin
 
 Content—not shell chrome—adapts. Width classes are compact below 600 dp, medium from 600 dp, and expanded from 840 dp. Onboarding content is capped at 560 dp and upper-anchored on regular-height screens; it becomes scrollable below 700 dp or above 1.3× font scale. Main feature content begins 8 dp below the app bar. Expanded screens use list/detail space rather than stretching a phone column. This follows Android’s [window-size-class guidance](https://developer.android.com/develop/adaptive-apps/guides/use-window-size-classes).
 
+## Feature canvas contract
+
+The host passes one Compose `FeatureCanvas` to `ShellApp`. The shell checks access before composing it. A feature reports `reportSuccessfulAction(stableActionId)` only after the useful domain operation commits successfully; the persistent ledger deduplicates retries and is bounded by the configured cap. The feature may request the paywall but cannot grant itself entitlement.
+
 ## Purchase contract
 
-The controller uses Play Billing 9.1.0 to query one-time products and subscriptions, display Play-provided price/eligibility, launch the selected flow, restore active purchases, and acknowledge verified purchases. The default verifier exists only for license testing. Supply a trusted-server `PurchaseVerifier` before production; Google recommends secure backend processing in its [billing integration guide](https://developer.android.com/google/play/billing/integrate). Products must also exist and be active in Play Console for the installed test-track build.
+The controller uses Play Billing 9.1.0 to query one-time products and subscriptions, display Play-provided price/eligibility, launch the selected flow, represent pending purchases, restore active purchases, and acknowledge only verified purchases. It rejects unconfigured product IDs and refreshes on resume. The built-in verifier checks the Play signature with the configured licensing public key and rejects blank/invalid keys; an asynchronous trusted-service `PurchaseVerifier` can be injected. Google recommends secure backend processing in its [billing integration guide](https://developer.android.com/google/play/billing/integrate).
+
+Successful authoritative queries replace cached entitlements, which applies refunds and revocations. Offline query failure preserves a valid cache. One-time purchases cache until the next authoritative query; subscriptions use a configurable 0–168 hour grace window.
 
 ## Advertising contract
 
 UMP 4.0.0 refreshes consent status at every launch. Ads initialize and load only when `canRequestAds()` is true. Settings exposes “Ad privacy choices” whenever UMP says an entry point is required. Configure the privacy message in AdMob; code alone cannot create the account-side message. See Google’s [UMP setup](https://developers.google.com/admob/android/privacy).
+
+Set `-PshellAdsEnabled=false` for an ad-free artifact. That build removes the `AD_ID` permission and AdMob application metadata from the merged manifest and does not initialize UMP or Mobile Ads.
 
 ## Brand and release gate
 
