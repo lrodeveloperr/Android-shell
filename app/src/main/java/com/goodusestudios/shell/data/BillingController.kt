@@ -45,9 +45,9 @@ class BillingController(
     private val configuredProducts: List<PurchaseProduct>,
     private val verifier: PurchaseVerifier = PurchaseVerifier { true },
 ) : PurchasesUpdatedListener {
+    private val detailsById = mutableMapOf<String, ProductDetails>()
     private val _state = MutableStateFlow(BillingUiState(products = fallbackProducts()))
     val state: StateFlow<BillingUiState> = _state.asStateFlow()
-    private val detailsById = mutableMapOf<String, ProductDetails>()
     private val readyActions = mutableListOf<() -> Unit>()
     private var connecting = false
 
