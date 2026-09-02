@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.os.ConfigurationCompat
 import org.json.JSONObject
 import java.util.Locale
 
@@ -126,10 +127,9 @@ fun rememberGoodUseLabelResolver(
 ): (String) -> String {
     val context = LocalContext.current.applicationContext
     val configuration = LocalConfiguration.current
-    val localeTag = configuration.locales[0]?.toLanguageTag() ?: Locale.getDefault().toLanguageTag()
+    val localeTag = ConfigurationCompat.getLocales(configuration)[0]?.toLanguageTag() ?: "en"
     val bundle = remember(context) { GoodUseCommonLocalization.bundled(context) }
     return remember(bundle, localeTag, appDelta) {
         bundle.labelResolver(localeTag = localeTag, appDelta = appDelta)
     }
 }
-
