@@ -36,7 +36,7 @@ Every main-branch update is compiled from a clean runner before its APK artifact
 
 Open the repository in current Android Studio, or run `gradle assembleDebug` with JDK 17 and Android SDK 36.
 
-For a build that cannot request advertising ID access and never initializes the ad stack, run `gradle assembleRelease -PshellAdsEnabled=false`. The ordinary build defaults to ads-capable so every template option remains demonstrable.
+Build `assembleAdsRelease` for an ads-capable artifact. Build `assembleNoAdsRelease` for an artifact that cannot request advertising ID access and never initializes the ad stack. Both native flavors compile in CI.
 
 ## Monetization behavior
 

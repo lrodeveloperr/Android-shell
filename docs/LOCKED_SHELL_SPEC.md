@@ -48,7 +48,7 @@ Successful authoritative queries replace cached entitlements, which applies refu
 
 UMP 4.0.0 refreshes consent status at every launch. Ads initialize and load only when `canRequestAds()` is true. Settings exposes “Ad privacy choices” whenever UMP says an entry point is required. Configure the privacy message in AdMob; code alone cannot create the account-side message. See Google’s [UMP setup](https://developers.google.com/admob/android/privacy).
 
-Set `-PshellAdsEnabled=false` for an ad-free artifact. That build removes the `AD_ID` permission and AdMob application metadata from the merged manifest and does not initialize UMP or Mobile Ads.
+Use the `noAds` flavor for an ad-free artifact. It removes the `AD_ID` permission and Mobile Ads initializer from the merged manifest and does not initialize UMP or Mobile Ads. The `ads` flavor supplies the AdMob application metadata.
 
 ## Brand and release gate
 
@@ -58,7 +58,7 @@ Run:
 
 ```bash
 bash scripts/validate-shell.sh --strict
-gradle testDebugUnitTest lintDebug assembleDebug
+gradle testAdsDebugUnitTest lintAdsDebug assembleAdsDebug assembleNoAdsDebug
 ```
 
 Strict validation intentionally fails until the app name, support/legal values, products, and Google demo ad ID have been replaced. This is the safety rail that turns customization omissions into build-time failures.

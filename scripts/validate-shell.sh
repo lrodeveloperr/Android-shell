@@ -3,6 +3,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 manifest="$root/app/src/main/AndroidManifest.xml"
+ads_manifest="$root/app/src/ads/AndroidManifest.xml"
 config="$root/app/src/main/java/com/goodusestudios/shell/ui/ShellConfig.kt"
 localization="$root/app/src/main/assets/gooduse-common-localization-v1.json"
 
@@ -17,6 +18,8 @@ required=(
   "$root/app/src/main/java/com/goodusestudios/shell/data/AccessPolicy.kt"
   "$root/app/src/main/java/com/goodusestudios/shell/ui/FeatureCanvas.kt"
   "$root/app/src/main/res/xml/locales_config.xml"
+  "$ads_manifest"
+  "$root/app/src/noAds/AndroidManifest.xml"
   "$localization"
 )
 for file in "${required[@]}"; do
@@ -57,12 +60,12 @@ if any(not key.startswith('common.') for key in bundle.get('entries', {})):
     raise SystemExit('Localization bundle contains a non-common semantic key')
 PY
 
-if rg -n --glob '*.kt' --glob '*.kts' --glob '*.xml' '(io\.flutter|FlutterActivity|flutter:)' "$root/app" "$root/build.gradle.kts" "$root/settings.gradle.kts" >/dev/null; then
+if grep -R -n -E --include='*.kt' --include='*.kts' --include='*.xml' '(io\.flutter|FlutterActivity|flutter:)' "$root/app" "$root/build.gradle.kts" "$root/settings.gradle.kts" >/dev/null; then
   echo "Flutter code or dependencies are forbidden in the native Jetpack shell" >&2
   exit 1
 fi
 
-if rg -n 'PurchaseVerifier\s*\{\s*true\s*\}' "$root/app/src/main/java" >/dev/null; then
+if grep -R -n -E 'PurchaseVerifier[[:space:]]*\{[[:space:]]*true[[:space:]]*\}' "$root/app/src/main/java" >/dev/null; then
   echo "Fail-open purchase verifier detected" >&2
   exit 1
 fi
@@ -76,7 +79,7 @@ if [[ "${1:-}" == "--strict" ]]; then
   grep -q 'example.com' "$config" && { echo "Replace example legal/support values" >&2; exit 1; }
   grep -q 'shell.pro.' "$config" && { echo "Replace template Play product IDs" >&2; exit 1; }
   grep -q 'playLicensePublicKey = ""' "$config" && { echo "Configure Play signature verification or inject a trusted PurchaseVerifier" >&2; exit 1; }
-  grep -q 'ca-app-pub-3940256099942544' "$manifest" && { echo "Replace Google test AdMob app ID" >&2; exit 1; }
+  grep -q 'ca-app-pub-3940256099942544' "$ads_manifest" && { echo "Replace Google test AdMob app ID" >&2; exit 1; }
 fi
 
 echo "Shell structure validated${1:+ ($1)}."
