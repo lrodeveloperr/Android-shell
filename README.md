@@ -28,7 +28,7 @@ A native, reusable Jetpack Compose application shell for phones, foldables, and 
 5. Replace Google’s demo AdMob identifiers and implement consent before requesting production ads.
 6. Configure matching products in Play Console and set the licensing public key for local signature verification, or inject a trusted asynchronous `PurchaseVerifier`. Blank or failed verification never grants access.
 7. Replace the legal placeholders with reviewed, app-specific documents and increment `legal.version` when acceptance must be renewed.
-8. Run `bash scripts/validate-shell.sh --strict`; a derived release must not contain template identity or identifiers.
+8. Run `bash scripts/validate-shell.sh --strict ads` or `bash scripts/validate-shell.sh --strict noAds` for the artifact you will ship; a derived release must not contain template identity or incompatible identifiers.
 
 The exact locked/customizable boundary and supporting Android sources are in [`docs/LOCKED_SHELL_SPEC.md`](docs/LOCKED_SHELL_SPEC.md).
 

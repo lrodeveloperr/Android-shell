@@ -57,7 +57,7 @@ Replace every file listed in `branding/README.md` as one change. The adaptive ic
 Run:
 
 ```bash
-bash scripts/validate-shell.sh --strict
+bash scripts/validate-shell.sh --strict ads # or: --strict noAds
 gradle testAdsDebugUnitTest lintAdsDebug assembleAdsDebug assembleNoAdsDebug
 ```
 

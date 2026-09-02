@@ -33,7 +33,7 @@ jobs:
           gradle --no-daemon lintAdsDebug || { find app/build -name 'lint-results-adsDebug.txt' -exec cat {} \;; exit 1; }
       - name: Verify ad-free build contract
         run: |
-          gradle --no-daemon assembleNoAdsDebug
+          gradle --no-daemon assembleNoAdsDebug assembleAdsRelease assembleNoAdsRelease
           ! grep -R 'com.google.android.gms.permission.AD_ID' app/build/intermediates/merged_manifests/noAdsDebug
           ! grep -R 'MobileAdsInitProvider\|com.google.android.gms.ads.APPLICATION_ID' app/build/intermediates/merged_manifests/noAdsDebug
       - uses: actions/upload-artifact@v4

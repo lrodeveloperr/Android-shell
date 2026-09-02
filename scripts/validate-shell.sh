@@ -75,11 +75,23 @@ grep -q 'recordSuccessfulAction' "$root/app/src/main/java/com/goodusestudios/she
 grep -q 'purchase.products.all' "$root/app/src/main/java/com/goodusestudios/shell/data/BillingController.kt"
 
 if [[ "${1:-}" == "--strict" ]]; then
+  release_flavor="${2:-ads}"
+  [[ "$release_flavor" == "ads" || "$release_flavor" == "noAds" ]] || {
+    echo "Strict flavor must be ads or noAds" >&2
+    exit 1
+  }
   grep -q 'appName = "Shell"' "$config" && { echo "Replace template app name" >&2; exit 1; }
   grep -q 'example.com' "$config" && { echo "Replace example legal/support values" >&2; exit 1; }
   grep -q 'shell.pro.' "$config" && { echo "Replace template Play product IDs" >&2; exit 1; }
-  grep -q 'playLicensePublicKey = ""' "$config" && { echo "Configure Play signature verification or inject a trusted PurchaseVerifier" >&2; exit 1; }
-  grep -q 'ca-app-pub-3940256099942544' "$ads_manifest" && { echo "Replace Google test AdMob app ID" >&2; exit 1; }
+  if grep -q -E 'initialMode = MonetizationMode\.(AdsWithRemovePurchase|OneTimeUnlock|Subscription|UsageCapWithOneTimeUnlock|UsageCapWithSubscription)' "$config"; then
+    grep -q 'playLicensePublicKey = ""' "$config" && { echo "Configure Play signature verification or inject a trusted PurchaseVerifier" >&2; exit 1; }
+  fi
+  if [[ "$release_flavor" == "ads" ]]; then
+    grep -q 'ca-app-pub-3940256099942544' "$ads_manifest" && { echo "Replace Google test AdMob app ID" >&2; exit 1; }
+  elif grep -q -E 'initialMode = MonetizationMode\.(Ads|AdsWithRemovePurchase)' "$config"; then
+    echo "The noAds release flavor cannot use an ads monetization profile" >&2
+    exit 1
+  fi
 fi
 
 echo "Shell structure validated${1:+ ($1)}."
