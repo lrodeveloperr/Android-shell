@@ -29,6 +29,8 @@ A native, reusable Jetpack Compose application shell for phones, foldables, and 
 
 The exact locked/customizable boundary and supporting Android sources are in [`docs/LOCKED_SHELL_SPEC.md`](docs/LOCKED_SHELL_SPEC.md).
 
+Every main-branch update is compiled from a clean runner before its APK artifact is used.
+
 Open the repository in current Android Studio, or run `gradle assembleDebug` with JDK 17 and Android SDK 36.
 
 ## Shell rule
