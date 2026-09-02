@@ -78,7 +78,18 @@ fun ShellApp(
     when (gate) {
         null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         ShellGate.FullOnboarding -> {
-            if (definition.onboarding.presentation == OnboardingPresentation.None) {
+            if (
+                definition.onboarding.presentation == OnboardingPresentation.None &&
+                definition.onboarding.requireLegalAcceptance
+            ) {
+                LegalUpdateScreen(
+                    legal = definition.legal,
+                    onPrivacy = { onboardingDialog = Route.Privacy },
+                    onTerms = { onboardingDialog = Route.Terms },
+                    onAccept = { scope.launch { stateStore.completeOnboarding(definition.legal.version) } },
+                )
+                OnboardingLegalDialog(onboardingDialog) { onboardingDialog = null }
+            } else if (definition.onboarding.presentation == OnboardingPresentation.None) {
                 LaunchedEffect(Unit) { stateStore.completeOnboarding(definition.legal.version) }
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
