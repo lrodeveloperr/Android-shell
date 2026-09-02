@@ -2,6 +2,10 @@
 
 A native, reusable Jetpack Compose application shell for phones, foldables, and tablets. It deliberately contains no product-domain logic.
 
+## AI coding tools
+
+Start with [`AGENTS.md`](AGENTS.md). It is the operational source map for the locked shell boundary, safe customization order, feature-canvas contract, advertising flavors, monetization enforcement, localization and release blockers.
+
 ## What is included
 
 - Material 3, edge-to-edge, dynamic color, light/dark mode, large text, RTL support
