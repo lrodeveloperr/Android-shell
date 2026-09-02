@@ -55,6 +55,8 @@ gradle testDebugUnitTest lintDebug assembleDebug
 
 Strict validation intentionally fails until the app name, support/legal values, products, and Google demo ad ID have been replaced. This is the safety rail that turns customization omissions into build-time failures.
 
+Pull requests run the same structural check, unit suite, lint task, and APK assembly on a clean runner.
+
 ## Source basis
 
 The decisions above are grounded in Android’s official guidance for [adaptive icons](https://developer.android.com/develop/ui/compose/system/icon_design_adaptive), [SplashScreen](https://developer.android.com/develop/ui/views/launch/splash-screen), [per-app languages](https://developer.android.com/guide/topics/resources/app-languages), [app architecture](https://developer.android.com/topic/architecture), [DataStore](https://developer.android.com/topic/libraries/architecture/datastore), and [Play Billing](https://developer.android.com/google/play/billing/integrate).
