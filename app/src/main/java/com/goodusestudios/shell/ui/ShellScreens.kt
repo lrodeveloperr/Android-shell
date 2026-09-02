@@ -2,19 +2,27 @@ package com.goodusestudios.shell.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.CloudOff
@@ -45,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,26 +66,73 @@ fun OnboardingScreen(onPrivacy: () -> Unit, onTerms: () -> Unit, onComplete: () 
         Triple("Skin it, then build", "Change tokens and configuration first. Replace placeholder features only after your product logic is settled.", "03"),
     )
     var page by remember { mutableIntStateOf(0) }
-    Column(
-        Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(ShellConfig.appName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Text(pages[page].third, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text(pages[page].first, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-            Text(pages[page].second, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                onClick = { if (page < pages.lastIndex) page++ else onComplete() },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (page == pages.lastIndex) "Get started" else "Continue") }
-            if (page > 0) OutlinedButton({ page-- }, Modifier.fillMaxWidth()) { Text("Back") }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                TextButton(onClick = onPrivacy) { Text("Privacy") }
-                TextButton(onClick = onTerms) { Text("Terms") }
+    BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
+        val layoutMode = onboardingLayoutModeFor(maxHeight.value.toInt(), LocalDensity.current.fontScale)
+        val contentModifier = Modifier
+            .align(Alignment.Center)
+            .fillMaxHeight()
+            .widthIn(max = 560.dp)
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp, vertical = 16.dp)
+
+        if (layoutMode == OnboardingLayoutMode.Scrollable) {
+            Column(contentModifier.verticalScroll(rememberScrollState())) {
+                OnboardingHeader()
+                Spacer(Modifier.height(24.dp))
+                OnboardingPage(pages[page])
+                Spacer(Modifier.height(32.dp))
+                OnboardingActions(page, pages.lastIndex, onPrivacy, onTerms, { page-- }) {
+                    if (page < pages.lastIndex) page++ else onComplete()
+                }
             }
+        } else {
+            Column(contentModifier) {
+                OnboardingHeader()
+                Spacer(Modifier.height(if (maxHeight >= 900.dp) 56.dp else 40.dp))
+                OnboardingPage(pages[page])
+                Spacer(Modifier.weight(1f))
+                OnboardingActions(page, pages.lastIndex, onPrivacy, onTerms, { page-- }) {
+                    if (page < pages.lastIndex) page++ else onComplete()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingHeader() {
+    Text(ShellConfig.appName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+}
+
+@Composable
+private fun OnboardingPage(page: Triple<String, String, String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(page.third, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        Text(page.first, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+        Text(page.second, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun OnboardingActions(
+    page: Int,
+    lastPage: Int,
+    onPrivacy: () -> Unit,
+    onTerms: () -> Unit,
+    onBack: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Button(
+            onClick = onContinue,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) { Text(if (page == lastPage) "Get started" else "Continue") }
+        if (page > 0) {
+            OutlinedButton(onBack, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Back") }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            TextButton(onClick = onPrivacy) { Text("Privacy") }
+            TextButton(onClick = onTerms) { Text("Terms") }
         }
     }
 }
@@ -103,9 +159,12 @@ fun FeatureScreen(destination: String, state: SampleContentState, expanded: Bool
 
 @Composable
 private fun FeatureList(items: List<String>, modifier: Modifier) {
-    LazyColumn(modifier, contentPadding = PaddingValues(vertical = 8.dp)) {
+    LazyColumn(modifier, contentPadding = PaddingValues(bottom = 8.dp)) {
         item {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                Modifier.padding(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text("Today", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("This is the replaceable feature area. Shell chrome stays untouched.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -144,6 +203,7 @@ private fun StateMessage(title: String, message: String, action: String? = null)
 fun SettingsScreen(
     monetizationMode: MonetizationMode,
     onUpgrade: () -> Unit,
+    onIcons: () -> Unit,
     onLab: () -> Unit,
     onPrivacy: () -> Unit,
     onTerms: () -> Unit,
@@ -153,6 +213,7 @@ fun SettingsScreen(
         if (monetizationMode != MonetizationMode.Free) {
             item { SettingsRow("Upgrade", "Manage purchases and restore access", Icons.Outlined.LockOpen, onUpgrade) }
         }
+        item { SettingsRow("Icon library", "Search reusable Material icons", Icons.Outlined.Apps, onIcons) }
         item { SettingsRow("Language", "Follow system · English", Icons.Outlined.Language, {}) }
         item { SettingsRow("Help & support", ShellConfig.supportEmail, Icons.Outlined.SupportAgent, onSupport) }
         item { SettingsRow("Privacy policy", null, Icons.Outlined.Policy, onPrivacy) }

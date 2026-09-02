@@ -29,7 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
-private enum class Route { Main, Settings, Lab, Paywall, Privacy, Terms }
+private enum class Route { Main, Settings, Icons, Lab, Paywall, Privacy, Terms }
 
 @Composable
 fun ShellApp() {
@@ -148,6 +148,7 @@ private fun ShellScaffold(
     val title = when (route) {
         Route.Main -> ShellConfig.destinations.first { it.id == destinationId }.label
         Route.Settings -> "Settings"
+        Route.Icons -> "Icon library"
         Route.Lab -> "Shell Lab"
         Route.Paywall -> "Upgrade"
         Route.Privacy -> "Privacy Policy"
@@ -196,6 +197,7 @@ private fun ShellScaffold(
                 Route.Settings -> SettingsScreen(
                     monetizationMode = monetizationMode,
                     onUpgrade = { onNavigate(Route.Paywall) },
+                    onIcons = { onNavigate(Route.Icons) },
                     onLab = { onNavigate(Route.Lab) },
                     onPrivacy = { onNavigate(Route.Privacy) },
                     onTerms = { onNavigate(Route.Terms) },
@@ -203,6 +205,7 @@ private fun ShellScaffold(
                         context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${ShellConfig.supportEmail}")))
                     },
                 )
+                Route.Icons -> IconLibraryScreen()
                 Route.Lab -> LabScreen(
                     monetizationMode,
                     contentState,

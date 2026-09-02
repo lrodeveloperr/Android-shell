@@ -45,8 +45,18 @@ enum class SampleContentState { Populated, Empty, Loading, Error }
 
 enum class NavigationMode { BottomBar, Rail, Sidebar }
 
+enum class OnboardingLayoutMode { Anchored, Scrollable }
+
 fun navigationModeForWidth(widthDp: Int): NavigationMode = when {
     widthDp >= 840 -> NavigationMode.Sidebar
     widthDp >= 600 -> NavigationMode.Rail
     else -> NavigationMode.BottomBar
 }
+
+/**
+ * Content-specific breakpoint. The persistent onboarding actions need more
+ * vertical room than a normal scrolling screen, especially with large text.
+ */
+fun onboardingLayoutModeFor(heightDp: Int, fontScale: Float): OnboardingLayoutMode =
+    if (heightDp < 700 || fontScale > 1.3f) OnboardingLayoutMode.Scrollable
+    else OnboardingLayoutMode.Anchored
