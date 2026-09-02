@@ -60,7 +60,7 @@ fun ShellApp(
     val stateStore = remember { ShellStateStore(context.applicationContext) }
     val billingController = remember { BillingController(context, definition.monetization.products) }
     val billing by billingController.state.collectAsStateWithLifecycle()
-    val gate by stateStore.gate(definition.legal.version).collectAsStateWithLifecycle(initialValue = null)
+    var gate by remember { mutableStateOf<ShellGate?>(null) }
     var route by rememberSaveable { mutableStateOf(Route.Main) }
     var onboardingDialog by rememberSaveable { mutableStateOf<Route?>(null) }
     var destinationId by rememberSaveable { mutableStateOf(ShellConfig.destinations.first().id) }
@@ -70,6 +70,9 @@ fun ShellApp(
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(billingController) { billingController.connect() }
+    LaunchedEffect(stateStore, definition.legal.version) {
+        stateStore.gate(definition.legal.version).collect { gate = it }
+    }
     DisposableEffect(billingController) { onDispose { billingController.close() } }
 
     when (gate) {
