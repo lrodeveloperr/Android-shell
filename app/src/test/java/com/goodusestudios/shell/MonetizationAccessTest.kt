@@ -4,6 +4,7 @@ import com.goodusestudios.shell.data.AccessDenialReason
 import com.goodusestudios.shell.data.cachedEntitlementIsUsable
 import com.goodusestudios.shell.data.hasEntitlementForMode
 import com.goodusestudios.shell.data.nextSuccessfulActionIds
+import com.goodusestudios.shell.data.parseEntitlementRecords
 import com.goodusestudios.shell.data.resolveFeatureAccess
 import com.goodusestudios.shell.ui.MonetizationMode
 import com.goodusestudios.shell.ui.PurchaseProduct
@@ -53,6 +54,7 @@ class MonetizationAccessTest {
         assertEquals(once, retry)
         assertEquals(setOf("job-42", "job-43"), full)
         assertEquals(full, nextSuccessfulActionIds(full, "job-44", 2))
+        assertEquals(full, nextSuccessfulActionIds(full, "x".repeat(129), 3))
     }
 
     @Test fun entitlementsAreScopedToTheProfileProductKind() {
@@ -71,5 +73,12 @@ class MonetizationAccessTest {
         assertFalse(cachedEntitlementIsUsable(StoreProductKind.Subscription, hour, 74 * hour, 72))
         assertTrue(cachedEntitlementIsUsable(StoreProductKind.OneTime, hour, 10_000 * hour, 0))
         assertFalse(cachedEntitlementIsUsable(StoreProductKind.OneTime, 0, hour, 0))
+    }
+
+    @Test fun entitlementRecordsKeepIndependentVerificationTimes() {
+        assertEquals(
+            mapOf("lifetime" to 100L, "monthly" to 200L),
+            parseEntitlementRecords(setOf("lifetime\t100", "monthly\t200", "invalid")),
+        )
     }
 }

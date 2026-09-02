@@ -82,6 +82,7 @@ class BillingController(
     private val _state = MutableStateFlow(BillingUiState(products = fallbackProducts()))
     val state: StateFlow<BillingUiState> = _state.asStateFlow()
     private val readyActions = mutableListOf<() -> Unit>()
+    private var cachedVerificationTimes: Map<String, Long> = emptyMap()
     private var connecting = false
 
     private val billingClient = BillingClient.newBuilder(context.applicationContext)
@@ -247,18 +248,19 @@ class BillingController(
                     purchase.products.all { it in configuredById } &&
                     verifier.verify(purchase)
             }
-            val verifiedIds = verified.flatMap { it.products }.toSet()
-            val resultingIds = if (authoritative) verifiedIds else _state.value.entitledProductIds + verifiedIds
-            if (authoritative || verifiedIds.isNotEmpty()) {
-                stateStore.replaceEntitlements(resultingIds, now())
+            val verificationTime = now()
+            val verifiedTimes = verified.flatMap { it.products }.associateWith { verificationTime }
+            val resultingTimes = if (authoritative) verifiedTimes else cachedVerificationTimes + verifiedTimes
+            if (authoritative || verifiedTimes.isNotEmpty()) {
+                stateStore.replaceEntitlements(resultingTimes)
             }
             _state.value = _state.value.copy(
-                entitledProductIds = resultingIds,
+                entitledProductIds = resultingTimes.keys,
                 pending = pending,
                 working = false,
                 message = when {
                     pending -> "Purchase pending. Access starts after Google Play confirms payment."
-                    purchases.any { it.purchaseState == Purchase.PurchaseState.PURCHASED } && verifiedIds.isEmpty() ->
+                    purchases.any { it.purchaseState == Purchase.PurchaseState.PURCHASED } && verifiedTimes.isEmpty() ->
                         "Purchase verification failed. Access was not granted."
                     else -> null
                 },
@@ -277,17 +279,18 @@ class BillingController(
     }
 
     private fun applyCachedEntitlement(snapshot: ShellPersistentState) {
-        val validIds = snapshot.entitledProductIds.filterTo(mutableSetOf()) { productId ->
+        val validTimes = snapshot.entitlementVerifiedAtByProduct.filter { (productId, verifiedAt) ->
             configuredById[productId]?.let { product ->
                 cachedEntitlementIsUsable(
                     product.kind,
-                    snapshot.entitlementVerifiedAtEpochMillis,
+                    verifiedAt,
                     now(),
                     subscriptionGraceHours,
                 )
             } == true
         }
-        _state.value = _state.value.copy(entitledProductIds = validIds)
+        cachedVerificationTimes = validTimes
+        _state.value = _state.value.copy(entitledProductIds = validTimes.keys)
     }
 
     private fun toBillingProduct(config: PurchaseProduct): BillingProduct {

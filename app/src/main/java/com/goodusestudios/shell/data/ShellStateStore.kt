@@ -23,19 +23,21 @@ sealed interface ShellGate {
 
 data class ShellPersistentState(
     val successfulActionIds: Set<String> = emptySet(),
-    val entitledProductIds: Set<String> = emptySet(),
-    val entitlementVerifiedAtEpochMillis: Long = 0,
-)
+    val entitlementVerifiedAtByProduct: Map<String, Long> = emptyMap(),
+) {
+    val entitledProductIds: Set<String> get() = entitlementVerifiedAtByProduct.keys
+}
 
 class ShellStateStore(private val context: Context) {
     private val data = context.shellStateDataStore.data
         .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
 
     val state: Flow<ShellPersistentState> = data.map { preferences ->
+        val legacyTimestamp = preferences[ENTITLEMENT_VERIFIED_AT] ?: 0
+        val legacy = preferences[ENTITLED_PRODUCT_IDS].orEmpty().associateWith { legacyTimestamp }
         ShellPersistentState(
             successfulActionIds = preferences[SUCCESSFUL_ACTION_IDS].orEmpty(),
-            entitledProductIds = preferences[ENTITLED_PRODUCT_IDS].orEmpty(),
-            entitlementVerifiedAtEpochMillis = preferences[ENTITLEMENT_VERIFIED_AT] ?: 0,
+            entitlementVerifiedAtByProduct = parseEntitlementRecords(preferences[ENTITLEMENT_RECORDS].orEmpty()) + legacy,
         )
     }
 
@@ -60,7 +62,7 @@ class ShellStateStore(private val context: Context) {
 
     /** Count only unique domain operations after they have completed successfully. */
     suspend fun recordSuccessfulAction(actionId: String, cap: Int) {
-        require(actionId.isNotBlank()) { "A stable action ID is required" }
+        require(actionId.length in 1..128) { "A stable action ID of 1 to 128 characters is required" }
         if (cap < 1) return
         context.shellStateDataStore.edit { preferences ->
             val current = preferences[SUCCESSFUL_ACTION_IDS].orEmpty()
@@ -68,14 +70,16 @@ class ShellStateStore(private val context: Context) {
         }
     }
 
-    suspend fun replaceEntitlements(productIds: Set<String>, verifiedAtEpochMillis: Long) {
+    suspend fun replaceEntitlements(verifiedAtByProduct: Map<String, Long>) {
         context.shellStateDataStore.edit { preferences ->
-            if (productIds.isEmpty()) {
-                preferences.remove(ENTITLED_PRODUCT_IDS)
-                preferences.remove(ENTITLEMENT_VERIFIED_AT)
+            preferences.remove(ENTITLED_PRODUCT_IDS)
+            preferences.remove(ENTITLEMENT_VERIFIED_AT)
+            if (verifiedAtByProduct.isEmpty()) {
+                preferences.remove(ENTITLEMENT_RECORDS)
             } else {
-                preferences[ENTITLED_PRODUCT_IDS] = productIds
-                preferences[ENTITLEMENT_VERIFIED_AT] = verifiedAtEpochMillis
+                preferences[ENTITLEMENT_RECORDS] = verifiedAtByProduct.mapTo(mutableSetOf()) { (id, timestamp) ->
+                    "$id\t$timestamp"
+                }
             }
         }
     }
@@ -93,6 +97,18 @@ class ShellStateStore(private val context: Context) {
         val SUCCESSFUL_ACTION_IDS = stringSetPreferencesKey("successful_action_ids")
         val ENTITLED_PRODUCT_IDS = stringSetPreferencesKey("entitled_product_ids")
         val ENTITLEMENT_VERIFIED_AT = longPreferencesKey("entitlement_verified_at")
+        val ENTITLEMENT_RECORDS = stringSetPreferencesKey("entitlement_records_v2")
+    }
+}
+
+fun parseEntitlementRecords(records: Set<String>): Map<String, Long> = buildMap {
+    records.forEach { record ->
+        val separator = record.lastIndexOf('\t')
+        if (separator > 0) {
+            record.substring(separator + 1).toLongOrNull()?.takeIf { it > 0 }?.let { timestamp ->
+                put(record.substring(0, separator), timestamp)
+            }
+        }
     }
 }
 

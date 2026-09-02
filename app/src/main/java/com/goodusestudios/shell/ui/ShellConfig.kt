@@ -73,8 +73,8 @@ object ShellConfig {
         val monetization = definition.monetization
         if (monetization.products.map { it.id }.distinct().size != monetization.products.size) add("Play product IDs must be unique")
         if (monetization.products.any { it.id.isBlank() }) add("Play product IDs must not be blank")
-        if (monetization.initialMode.usesUsageCap && monetization.freeSuccessfulActions < 1) {
-            add("usage-cap modes require at least one free successful action")
+        if (monetization.initialMode.usesUsageCap && monetization.freeSuccessfulActions !in 1..1000) {
+            add("usage-cap modes require 1 to 1000 free successful actions")
         }
         if (monetization.subscriptionOfflineGraceHours !in 0..168) {
             add("subscription offline grace must be between 0 and 168 hours")

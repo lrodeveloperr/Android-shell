@@ -61,6 +61,6 @@ fun cachedEntitlementIsUsable(
 }
 
 fun nextSuccessfulActionIds(current: Set<String>, actionId: String, cap: Int): Set<String> = when {
-    actionId.isBlank() || cap < 1 || current.size >= cap || actionId in current -> current
+    actionId.isBlank() || actionId.length > 128 || cap < 1 || current.size >= cap || actionId in current -> current
     else -> current + actionId
 }
