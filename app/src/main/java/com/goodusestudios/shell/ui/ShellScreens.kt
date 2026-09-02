@@ -192,7 +192,7 @@ fun LabScreen(
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item {
             Text("Monetization", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            MonetizationMode.entries.forEach { value ->
+            MonetizationMode.values().forEach { value ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = mode == value, onClick = { onMode(value) })
                     Text(value.readableName())
@@ -201,7 +201,7 @@ fun LabScreen(
         }
         item {
             Text("Feature state", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            SampleContentState.entries.forEach { value ->
+            SampleContentState.values().forEach { value ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = state == value, onClick = { onState(value) })
                     Text(value.name)
