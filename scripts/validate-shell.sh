@@ -101,9 +101,6 @@ if [[ "${1:-}" == "--strict" ]]; then
   fi
 fi
 
-echo "Shell structure validated${1:+ ($1)}."
-
-
 # Locked contract and conservative defaults.
 grep -q 'const val contractVersion = "2.1.0"' "$config"
 grep -q 'presentation = OnboardingPresentation.None' "$config"
@@ -128,3 +125,5 @@ if [[ "${1:-}" == "--strict" ]] && grep -q 'DECISION_REQUIRED' "$root/docs/APP_P
   echo "Strict release blocked: complete docs/APP_POLICY_PROFILE.md." >&2
   exit 1
 fi
+
+echo "Shell structure validated${1:+ ($1)}."
