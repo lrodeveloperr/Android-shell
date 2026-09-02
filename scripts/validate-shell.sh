@@ -121,6 +121,24 @@ for required_text in 'Restore purchases' 'Privacy' 'Terms' 'renews automatically
   }
 done
 
+# Future dedicated commerce files inherit the same invariant automatically.
+while IFS= read -r commerce_file; do
+  if grep -Eq '(^|[^A-Za-z])(Image|AsyncImage)[[:space:]]*\(' "$commerce_file" ||
+     grep -Eq 'ic_brand_mark|ic_launcher|shell-app-logo' "$commerce_file"; then
+    echo "Purchase-surface policy violation: branded image reference in $commerce_file" >&2
+    exit 1
+  fi
+done < <(
+  find "$root/app/src" -type f -name '*.kt' |
+    grep -Ei '/[^/]*(paywall|purchase|subscription|restore|winback|win-back|commerce|upgrade|offer)[^/]*\.ktif [[ "${1:-}" == "--strict" ]] && grep -q 'DECISION_REQUIRED' "$root/docs/APP_POLICY_PROFILE.md"; then
+  echo "Strict release blocked: complete docs/APP_POLICY_PROFILE.md." >&2
+  exit 1
+fi
+
+echo "Shell structure validated${1:+ ($1)}."
+ || true
+)
+
 if [[ "${1:-}" == "--strict" ]] && grep -q 'DECISION_REQUIRED' "$root/docs/APP_POLICY_PROFILE.md"; then
   echo "Strict release blocked: complete docs/APP_POLICY_PROFILE.md." >&2
   exit 1
