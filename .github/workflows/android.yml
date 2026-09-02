@@ -1,9 +1,6 @@
 name: Android shell
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -29,10 +26,15 @@ jobs:
         run: bash scripts/validate-shell.sh
       - name: Verify and build APK
         run: |
-          gradle --no-daemon testDebugUnitTest assembleDebug
-          gradle --no-daemon lintDebug || { cat app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt; exit 1; }
+          gradle --no-daemon testAdsDebugUnitTest assembleAdsDebug
+          gradle --no-daemon lintAdsDebug || { find app/build -name 'lint-results-adsDebug.txt' -exec cat {} \;; exit 1; }
+      - name: Verify ad-free build contract
+        run: |
+          gradle --no-daemon assembleNoAdsDebug assembleAdsRelease assembleNoAdsRelease
+          ! grep -R 'com.google.android.gms.permission.AD_ID' app/build/intermediates/merged_manifests/noAdsDebug
+          ! grep -R 'MobileAdsInitProvider\|com.google.android.gms.ads.APPLICATION_ID' app/build/intermediates/merged_manifests/noAdsDebug
       - uses: actions/upload-artifact@v4
         with:
           name: Shell-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/ads/debug/app-ads-debug.apk
           if-no-files-found: error

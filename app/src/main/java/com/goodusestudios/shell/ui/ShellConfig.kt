@@ -33,6 +33,10 @@ object ShellConfig {
         ),
         monetization = MonetizationConfig(
             initialMode = MonetizationMode.AdsWithRemovePurchase,
+            freeSuccessfulActions = 5,
+            subscriptionOfflineGraceHours = 72,
+            // Base64 Play Console licensing public key. Empty is deliberately fail-closed.
+            playLicensePublicKey = "",
             products = listOf(
                 PurchaseProduct("shell.pro.monthly", StoreProductKind.Subscription, "Shell Pro monthly", "Configured in Play Console"),
                 PurchaseProduct("shell.pro.lifetime", StoreProductKind.OneTime, "Lifetime unlock", "Configured in Play Console"),
@@ -66,9 +70,18 @@ object ShellConfig {
         }
         if (definition.destinations.map { it.id }.distinct().size != definition.destinations.size) add("destination IDs must be unique")
         if (definition.destinations.size !in 1..5) add("configure one to five top-level destinations")
-        if (definition.monetization.products.map { it.id }.distinct().size != definition.monetization.products.size) add("Play product IDs must be unique")
-        if (definition.monetization.initialMode != MonetizationMode.Free && definition.monetization.products.isEmpty()) {
-            add("monetized apps require at least one Play product")
+        val monetization = definition.monetization
+        if (monetization.products.map { it.id }.distinct().size != monetization.products.size) add("Play product IDs must be unique")
+        if (monetization.products.any { it.id.isBlank() }) add("Play product IDs must not be blank")
+        if (monetization.initialMode.usesUsageCap && monetization.freeSuccessfulActions !in 1..1000) {
+            add("usage-cap modes require 1 to 1000 free successful actions")
+        }
+        if (monetization.subscriptionOfflineGraceHours !in 0..168) {
+            add("subscription offline grace must be between 0 and 168 hours")
+        }
+        val requiredKind = monetization.initialMode.requiredProductKind
+        if (requiredKind != null && monetization.products.none { it.kind == requiredKind }) {
+            add("${monetization.initialMode} requires a $requiredKind Play product")
         }
     }
 }
@@ -103,6 +116,9 @@ data class OnboardingPage(val step: String, val title: String, val body: String)
 
 data class MonetizationConfig(
     val initialMode: MonetizationMode,
+    val freeSuccessfulActions: Int,
+    val subscriptionOfflineGraceHours: Int,
+    val playLicensePublicKey: String,
     val products: List<PurchaseProduct>,
     val benefits: List<String>,
 )
@@ -124,6 +140,24 @@ enum class MonetizationMode {
     Free, Ads, AdsWithRemovePurchase, OneTimeUnlock, Subscription,
     UsageCapWithOneTimeUnlock, UsageCapWithSubscription,
 }
+
+val MonetizationMode.usesAds: Boolean
+    get() = this == MonetizationMode.Ads || this == MonetizationMode.AdsWithRemovePurchase
+
+val MonetizationMode.usesUsageCap: Boolean
+    get() = this == MonetizationMode.UsageCapWithOneTimeUnlock ||
+        this == MonetizationMode.UsageCapWithSubscription
+
+val MonetizationMode.requiredProductKind: StoreProductKind?
+    get() = when (this) {
+        MonetizationMode.AdsWithRemovePurchase,
+        MonetizationMode.OneTimeUnlock,
+        MonetizationMode.UsageCapWithOneTimeUnlock -> StoreProductKind.OneTime
+        MonetizationMode.Subscription,
+        MonetizationMode.UsageCapWithSubscription -> StoreProductKind.Subscription
+        MonetizationMode.Free,
+        MonetizationMode.Ads -> null
+    }
 enum class SampleContentState { Populated, Empty, Loading, Error }
 enum class NavigationMode { BottomBar, Rail, Sidebar }
 enum class OnboardingLayoutMode { Anchored, Scrollable }

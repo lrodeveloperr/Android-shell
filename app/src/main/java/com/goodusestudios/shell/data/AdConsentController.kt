@@ -1,6 +1,7 @@
 package com.goodusestudios.shell.data
 
 import android.app.Activity
+import com.goodusestudios.shell.BuildConfig
 import com.google.android.gms.ads.MobileAds
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
@@ -16,12 +17,13 @@ data class AdConsentState(
 )
 
 class AdConsentController(private val activity: Activity, private val underAge: Boolean) {
-    private val consentInformation = UserMessagingPlatform.getConsentInformation(activity)
+    private val consentInformation by lazy { UserMessagingPlatform.getConsentInformation(activity) }
     private val _state = MutableStateFlow(AdConsentState())
     val state: StateFlow<AdConsentState> = _state.asStateFlow()
     private var adsInitialized = false
 
     fun gather() {
+        if (!BuildConfig.SHELL_ADS_ENABLED) return
         val params = ConsentRequestParameters.Builder().setTagForUnderAgeOfConsent(underAge).build()
         consentInformation.requestConsentInfoUpdate(
             activity,
@@ -36,10 +38,12 @@ class AdConsentController(private val activity: Activity, private val underAge: 
     }
 
     fun showPrivacyOptions() {
+        if (!BuildConfig.SHELL_ADS_ENABLED) return
         UserMessagingPlatform.showPrivacyOptionsForm(activity) { error -> updateState(error?.message) }
     }
 
     private fun updateState(message: String? = null) {
+        if (!BuildConfig.SHELL_ADS_ENABLED) return
         val canRequest = consentInformation.canRequestAds()
         if (canRequest && !adsInitialized) {
             adsInitialized = true

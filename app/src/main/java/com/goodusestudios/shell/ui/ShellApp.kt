@@ -40,10 +40,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.goodusestudios.shell.BuildConfig
+import com.goodusestudios.shell.data.AccessDenialReason
 import com.goodusestudios.shell.data.BillingController
 import com.goodusestudios.shell.data.BillingUiState
+import com.goodusestudios.shell.data.FeatureAccess
+import com.goodusestudios.shell.data.PlaySignaturePurchaseVerifier
+import com.goodusestudios.shell.data.PurchaseVerifier
 import com.goodusestudios.shell.data.ShellGate
+import com.goodusestudios.shell.data.ShellPersistentState
 import com.goodusestudios.shell.data.ShellStateStore
+import com.goodusestudios.shell.data.hasEntitlementForMode
+import com.goodusestudios.shell.data.productsForMode
+import com.goodusestudios.shell.data.resolveFeatureAccess
+import com.goodusestudios.shell.localization.rememberGoodUseLabelResolver
 import kotlinx.coroutines.launch
 
 private enum class Route { Main, Settings, Icons, Lab, Paywall, Privacy, Terms }
@@ -53,13 +65,24 @@ fun ShellApp(
     canRequestAds: Boolean,
     privacyOptionsRequired: Boolean,
     onPrivacyOptions: () -> Unit,
+    featureCanvas: FeatureCanvas = DefaultFeatureCanvas,
+    purchaseVerifier: PurchaseVerifier? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val definition = ShellConfig.definition
     val stateStore = remember { ShellStateStore(context.applicationContext) }
-    val billingController = remember { BillingController(context, definition.monetization.products) }
+    val billingController = remember(purchaseVerifier) {
+        BillingController(
+            context = context,
+            configuredProducts = definition.monetization.products,
+            stateStore = stateStore,
+            subscriptionGraceHours = definition.monetization.subscriptionOfflineGraceHours,
+            verifier = purchaseVerifier ?: PlaySignaturePurchaseVerifier(definition.monetization.playLicensePublicKey),
+        )
+    }
     val billing by billingController.state.collectAsStateWithLifecycle()
+    var persistentState by remember { mutableStateOf(ShellPersistentState()) }
     var gate by remember { mutableStateOf<ShellGate?>(null) }
     var route by rememberSaveable { mutableStateOf(Route.Main) }
     var onboardingDialog by rememberSaveable { mutableStateOf<Route?>(null) }
@@ -70,9 +93,11 @@ fun ShellApp(
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(billingController) { billingController.connect() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { billingController.connect() }
     LaunchedEffect(stateStore, definition.legal.version) {
         stateStore.gate(definition.legal.version).collect { gate = it }
     }
+    LaunchedEffect(stateStore) { stateStore.state.collect { persistentState = it } }
     DisposableEffect(billingController) { onDispose { billingController.close() } }
 
     when (gate) {
@@ -116,22 +141,34 @@ fun ShellApp(
             BackHandler(enabled = route != Route.Main) { route = Route.Main }
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val expanded = maxWidth >= 600.dp
-                val showAd = canRequestAds && monetizationMode in setOf(
-                    MonetizationMode.Ads,
-                    MonetizationMode.AdsWithRemovePurchase,
-                ) && !demoEntitlement && !billing.entitled
+                val effectiveMode = if (BuildConfig.DEBUG) monetizationMode else definition.monetization.initialMode
+                val entitled = demoEntitlement && BuildConfig.DEBUG || hasEntitlementForMode(
+                    effectiveMode,
+                    billing.entitledProductIds,
+                    definition.monetization.products,
+                )
+                val access = resolveFeatureAccess(
+                    effectiveMode,
+                    persistentState.successfulActionIds.size,
+                    definition.monetization.freeSuccessfulActions,
+                    entitled,
+                )
+                val showAd = canRequestAds && effectiveMode.usesAds && !entitled
 
                 if (expanded) {
                     Row(Modifier.fillMaxSize()) {
                         ShellRail(destinationId) { destinationId = it; route = Route.Main }
                         ShellScaffold(
-                            route, destinationId, true, false, showAd, monetizationMode, contentState,
+                            route, destinationId, true, false, showAd, effectiveMode, contentState,
                             privacyOptionsRequired, billing,
+                            access = access,
+                            featureCanvas = featureCanvas,
                             onNavigate = { route = it },
                             onDestination = { destinationId = it; route = Route.Main },
                             onMonetizationMode = { monetizationMode = it },
                             onContentState = { contentState = it },
-                            onRemoveAds = { demoEntitlement = !demoEntitlement },
+                            onSuccessfulAction = { actionId -> scope.launch { stateStore.recordSuccessfulAction(actionId, definition.monetization.freeSuccessfulActions) } },
+                            onRemoveAds = { if (BuildConfig.DEBUG) demoEntitlement = !demoEntitlement },
                             onResetOnboarding = { scope.launch { stateStore.resetOnboarding() } },
                             onLanguage = { showLanguageDialog = true },
                             onPrivacyOptions = onPrivacyOptions,
@@ -140,13 +177,16 @@ fun ShellApp(
                     }
                 } else {
                     ShellScaffold(
-                        route, destinationId, false, route == Route.Main, showAd, monetizationMode, contentState,
+                        route, destinationId, false, route == Route.Main, showAd, effectiveMode, contentState,
                         privacyOptionsRequired, billing,
+                        access = access,
+                        featureCanvas = featureCanvas,
                         onNavigate = { route = it },
                         onDestination = { destinationId = it; route = Route.Main },
                         onMonetizationMode = { monetizationMode = it },
                         onContentState = { contentState = it },
-                        onRemoveAds = { demoEntitlement = !demoEntitlement },
+                        onSuccessfulAction = { actionId -> scope.launch { stateStore.recordSuccessfulAction(actionId, definition.monetization.freeSuccessfulActions) } },
+                        onRemoveAds = { if (BuildConfig.DEBUG) demoEntitlement = !demoEntitlement },
                         onResetOnboarding = { scope.launch { stateStore.resetOnboarding() } },
                         onLanguage = { showLanguageDialog = true },
                         onPrivacyOptions = onPrivacyOptions,
@@ -197,10 +237,13 @@ private fun ShellScaffold(
     contentState: SampleContentState,
     privacyOptionsRequired: Boolean,
     billing: BillingUiState,
+    access: FeatureAccess,
+    featureCanvas: FeatureCanvas,
     onNavigate: (Route) -> Unit,
     onDestination: (String) -> Unit,
     onMonetizationMode: (MonetizationMode) -> Unit,
     onContentState: (SampleContentState) -> Unit,
+    onSuccessfulAction: (String) -> Unit,
     onRemoveAds: () -> Unit,
     onResetOnboarding: () -> Unit,
     onLanguage: () -> Unit,
@@ -208,15 +251,16 @@ private fun ShellScaffold(
     billingController: BillingController,
 ) {
     val context = LocalContext.current
+    val label = rememberGoodUseLabelResolver()
     val legal = ShellConfig.definition.legal
     val title = when (route) {
         Route.Main -> ShellConfig.destinations.first { it.id == destinationId }.label
-        Route.Settings -> "Settings"
+        Route.Settings -> label("common.settings")
         Route.Icons -> "Icon library"
         Route.Lab -> "Shell Lab"
         Route.Paywall -> "Upgrade"
-        Route.Privacy -> "Privacy Policy"
-        Route.Terms -> "Terms of Use"
+        Route.Privacy -> label("common.privacyPolicy")
+        Route.Terms -> label("common.termsOfUse")
     }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -226,14 +270,14 @@ private fun ShellScaffold(
                 navigationIcon = {
                     if (route != Route.Main) {
                         IconButton(onClick = { onNavigate(Route.Main) }) {
-                            Icon(Icons.Outlined.ArrowBack, "Back")
+                            Icon(Icons.Outlined.ArrowBack, label("common.back"))
                         }
                     }
                 },
                 actions = {
                     if (route == Route.Main) {
                         IconButton(onClick = { onNavigate(Route.Settings) }) {
-                            Icon(Icons.Outlined.Settings, "Settings")
+                            Icon(Icons.Outlined.Settings, label("common.settings"))
                         }
                     }
                 },
@@ -259,25 +303,51 @@ private fun ShellScaffold(
     ) { inner ->
         Box(Modifier.fillMaxSize().padding(inner)) {
             when (route) {
-                Route.Main -> FeatureScreen(destinationId, contentState, expanded) {
-                    onContentState(SampleContentState.Populated)
+                Route.Main -> if (access.allowed) {
+                    featureCanvas(
+                        FeatureCanvasScope(
+                            destinationId = destinationId,
+                            sampleState = contentState,
+                            expanded = expanded,
+                            remainingFreeActions = access.remainingFreeActions,
+                            reportSuccessfulAction = onSuccessfulAction,
+                            requestPaywall = { onNavigate(Route.Paywall) },
+                        ),
+                    )
+                } else {
+                    AccessLockedScreen(
+                        usageCapReached = access.reason == AccessDenialReason.UsageCapReached,
+                        onUpgrade = { onNavigate(Route.Paywall) },
+                    )
                 }
                 Route.Settings -> SettingsScreen(
                     monetizationMode = monetizationMode,
                     privacyOptionsRequired = privacyOptionsRequired,
+                    showLab = BuildConfig.DEBUG,
                     onUpgrade = { onNavigate(Route.Paywall) },
                     onIcons = { onNavigate(Route.Icons) },
                     onLanguage = onLanguage,
                     onPrivacyOptions = onPrivacyOptions,
-                    onLab = { onNavigate(Route.Lab) },
+                    onLab = { if (BuildConfig.DEBUG) onNavigate(Route.Lab) },
                     onPrivacy = { onNavigate(Route.Privacy) },
                     onTerms = { onNavigate(Route.Terms) },
                     onSupport = { openUri(context, "mailto:${ShellConfig.supportEmail}") },
                 )
                 Route.Icons -> IconLibraryScreen()
-                Route.Lab -> LabScreen(monetizationMode, contentState, onMonetizationMode, onContentState, onRemoveAds, onResetOnboarding)
+                Route.Lab -> if (BuildConfig.DEBUG) {
+                    LabScreen(monetizationMode, contentState, onMonetizationMode, onContentState, onRemoveAds, onResetOnboarding)
+                } else {
+                    AccessLockedScreen(usageCapReached = false, onUpgrade = { onNavigate(Route.Settings) })
+                }
                 Route.Paywall -> PaywallScreen(
-                    billing = billing,
+                    billing = billing.copy(
+                        products = billing.products.filter { product ->
+                            product.id in productsForMode(monetizationMode, ShellConfig.definition.monetization.products).map { it.id }
+                        },
+                        entitledProductIds = billing.entitledProductIds.filterTo(mutableSetOf()) { productId ->
+                            productId in productsForMode(monetizationMode, ShellConfig.definition.monetization.products).map { it.id }
+                        },
+                    ),
                     benefits = ShellConfig.definition.monetization.benefits,
                     onRetry = billingController::connect,
                     onRestore = billingController::restore,

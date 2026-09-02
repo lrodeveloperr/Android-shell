@@ -67,6 +67,9 @@ import androidx.compose.ui.unit.dp
 import com.goodusestudios.shell.R
 import com.goodusestudios.shell.data.BillingStatus
 import com.goodusestudios.shell.data.BillingUiState
+import com.goodusestudios.shell.localization.GoodUseCommonLocalization
+import com.goodusestudios.shell.localization.rememberGoodUseLabelResolver
+import java.util.Locale
 
 @Composable
 fun OnboardingScreen(
@@ -265,6 +268,7 @@ private fun StateMessage(title: String, message: String, action: String? = null,
 fun SettingsScreen(
     monetizationMode: MonetizationMode,
     privacyOptionsRequired: Boolean,
+    showLab: Boolean,
     onUpgrade: () -> Unit,
     onIcons: () -> Unit,
     onLanguage: () -> Unit,
@@ -274,19 +278,20 @@ fun SettingsScreen(
     onTerms: () -> Unit,
     onSupport: () -> Unit,
 ) {
+    val label = rememberGoodUseLabelResolver()
     LazyColumn(contentPadding = PaddingValues(vertical = 12.dp)) {
-        if (monetizationMode != MonetizationMode.Free) {
+        if (monetizationMode.requiredProductKind != null) {
             item { SettingsRow("Upgrade", "Purchase or restore access", Icons.Outlined.LockOpen, onUpgrade) }
         }
         item { SettingsRow("Icon library", "Search reusable Material icons", Icons.Outlined.Apps, onIcons) }
-        item { SettingsRow("App language", "System, English, or Spanish", Icons.Outlined.Language, onLanguage) }
+        item { SettingsRow(label("common.language"), "System or any supported app language", Icons.Outlined.Language, onLanguage) }
         if (privacyOptionsRequired) {
             item { SettingsRow("Ad privacy choices", "Review or withdraw advertising consent", Icons.Outlined.PrivacyTip, onPrivacyOptions) }
         }
-        item { SettingsRow("Help & support", ShellConfig.supportEmail, Icons.Outlined.SupportAgent, onSupport) }
-        item { SettingsRow("Privacy policy", null, Icons.Outlined.Policy, onPrivacy) }
-        item { SettingsRow("Terms of use", null, Icons.Outlined.CheckCircle, onTerms) }
-        item { SettingsRow("Shell Lab", "Exercise every reusable state", Icons.Outlined.Science, onLab) }
+        item { SettingsRow(label("common.support"), ShellConfig.supportEmail, Icons.Outlined.SupportAgent, onSupport) }
+        item { SettingsRow(label("common.privacyPolicy"), null, Icons.Outlined.Policy, onPrivacy) }
+        item { SettingsRow(label("common.termsOfUse"), null, Icons.Outlined.CheckCircle, onTerms) }
+        if (showLab) item { SettingsRow("Shell Lab", "Exercise every reusable state", Icons.Outlined.Science, onLab) }
         item {
             Text(
                 "Shell 2.0 · Run strict validation before shipping a derived app.",
@@ -311,14 +316,21 @@ private fun SettingsRow(title: String, subtitle: String?, icon: androidx.compose
 
 @Composable
 fun LanguageDialog(onDismiss: () -> Unit) {
-    val choices = listOf("" to "Follow system", "en" to "English", "es" to "Español")
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val bundle = remember(context) { GoodUseCommonLocalization.bundled(context.applicationContext) }
+    val choices = remember(bundle) {
+        listOf("" to "Follow system") + bundle.locales.map { tag ->
+            val locale = Locale.forLanguageTag(tag)
+            tag to locale.getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) }
+        }
+    }
     val current = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("App language") },
         text = {
-            Column {
-                choices.forEach { (tag, label) ->
+            LazyColumn(Modifier.heightIn(max = 480.dp)) {
+                items(choices) { (tag, label) ->
                     Row(
                         Modifier.fillMaxWidth().clickable {
                             androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(

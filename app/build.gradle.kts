@@ -17,6 +17,18 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    flavorDimensions += "advertising"
+    productFlavors {
+        create("ads") {
+            dimension = "advertising"
+            buildConfigField("boolean", "SHELL_ADS_ENABLED", "true")
+        }
+        create("noAds") {
+            dimension = "advertising"
+            buildConfigField("boolean", "SHELL_ADS_ENABLED", "false")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -29,8 +41,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
-    androidResources { generateLocaleConfig = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    androidResources { generateLocaleConfig = false }
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
 }
 
