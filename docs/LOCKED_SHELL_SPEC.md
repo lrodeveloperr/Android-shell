@@ -63,7 +63,7 @@ gradle testAdsDebugUnitTest lintAdsDebug assembleAdsDebug assembleNoAdsDebug
 
 Strict validation intentionally fails until the app name, support/legal values, products, and Google demo ad ID have been replaced. This is the safety rail that turns customization omissions into build-time failures.
 
-Pull requests run the same structural check, unit suite, lint task, and APK assembly on a clean runner.
+The manual GitHub workflow runs the same structural check, unit suite, lint task, and APK assemblies on a clean runner without consuming hosted minutes on every push or pull request.
 
 ## Source basis
 
