@@ -130,7 +130,7 @@ while IFS= read -r commerce_file; do
   fi
 done < <(
   find "$root/app/src" -type f -name '*.kt' ! -path '*/test/*' ! -path '*/androidTest/*' |
-    grep -Ei '/[^/]*(paywall|purchase|subscription|restore|winback|win-back|commerce|upgrade|offer)[^/]*\.kt
+    grep -Ei '/[^/]*(paywall|purchase|subscription|restore|winback|win-back|commerce|upgrade|offer)[^/]*[.]kt' || true
 )
 
 if [[ "${1:-}" == "--strict" ]] && grep -q 'DECISION_REQUIRED' "$root/docs/APP_POLICY_PROFILE.md"; then
