@@ -110,6 +110,8 @@ Use `assembleAdsRelease` only for an ads-capable app. Use `assembleNoAdsRelease`
 - The Play licensing public key must be configured, or a trusted `PurchaseVerifier` must be injected.
 - Blank or failed verification is fail-closed.
 - Pending purchases do not grant access.
+- Billing connect, product query, purchase and restore operations are single-flight. Keep at most one queued ready action and disable incompatible controls while billing work is active.
+- An empty product-details response is an unavailable-catalog result, not success. Show an explicit localized error and one full-size retry control; another empty result must remain visible instead of leaving an inert button or endless spinner.
 - A successful authoritative refresh replaces cached entitlements, so refunds and revocations close access.
 - Subscription offline grace is bounded to 0–168 hours.
 - Usage-cap records are durable, bounded and deduplicated.
@@ -128,6 +130,15 @@ The shell supports `None`, `SinglePage` and `Pager`. Legal acceptance remains ex
 - Do not branch on phone or tablet model names.
 - Preserve the scrollable onboarding fallback for short screens and large font scales.
 
+## Interaction reliability and touchscreen gate
+
+- Treat every visible control as one full-surface target of at least 48×48 dp. A row that looks tappable must own its complete click or selection semantics.
+- Build composite rows with one parent click action. Nested icons, labels, checkboxes and `RadioButton` controls use `onClick = null` when the parent owns selection so taps are not split into competing regions.
+- Give the parent semantics node the role, label, test tag and enabled state. Compose UI tests must act through that node—not a child text or icon that can hide a partial target.
+- Purchase, restore, retry, save, destructive confirmation and navigation actions are single-flight. Repeated taps must not queue duplicate mutations, billing calls or navigation events.
+- A label appearing is not evidence that its control works. Regression tests must cover edge taps, minimum bounds, exactly-once callbacks, disabled/loading states, rapid repeated taps, compact height, adaptive widths, TalkBack, RTL and large fonts.
+- Keyboard, dialogs, sheets, scrolling containers and edge-to-edge overlays must not intercept enabled controls. Diagnose gesture competition and state ownership before changing settled layout.
+
 ## Localization and accessibility
 
 - Keep the shared 31-language common-string contract intact.
@@ -136,6 +147,9 @@ The shell supports `None`, `SinglePage` and `Pager`. Legal acceptance remains ex
 - Actionable icons require localized descriptions; decorative icons use null.
 - Verify long text, RTL, large fonts and compact height without clipping.
 - Avoid hard-coded English inside product Composables.
+- Changing the in-app language must immediately update every visible header, navigation label and Settings row. Resolve display text from the active locale state; do not cache English titles outside recomposition.
+- Display locale-appropriate currency symbols in customer-facing fields while persisting ISO 4217 codes as the data identity. Do not silently combine or convert currencies.
+- Currency selectors contain current circulating regional currencies only. Exclude withdrawn codes, funds/accounting units, precious-metal codes, testing codes and other non-consumer entries; document and test the allow/exclude policy.
 
 ## Release blockers
 
@@ -146,8 +160,18 @@ When execution is authorized, validate the exact artifact:
 - Ads-capable: `bash scripts/validate-shell.sh --strict ads`
 - Ad-free: `bash scripts/validate-shell.sh --strict noAds`
 
+- Validation must run on a stock hosted runner. Optional tools such as `rg` require a built-in fallback, and their absence must never silently skip or weaken a gate.
+
 Do not start GitHub Actions as a substitute for an unrequested local run.
 
+
+## Store review evidence and subscription metadata
+
+- Attach the latest production build to the store release; never submit a screenshot/demo fixture as production.
+- Reconcile product ID, base-plan duration, base price, geographic prices, localized metadata, free limit, paid entitlement, restore path, lapse behavior and legal links across code, Play Console and reviewer instructions before submission.
+- Keep private reviewer evidence and instructions separate from public store graphics. Public promotional media must be purpose-built and must not reuse the launcher icon as an ordinary promotional asset.
+- Reviewer instructions identify the exact build and product, give a reproducible paywall path, state the free and paid behavior, and disclose material account, data, advertising and physical-goods boundaries.
+- Preparing a release or subscription is not submission. Do not send it to review or production without explicit authorization.
 
 ## Compliance baseline added in contract 2.1.0
 
